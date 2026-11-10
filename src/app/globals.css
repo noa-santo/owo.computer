@@ -14,7 +14,7 @@ body {
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: "Atkinson Hyperlegible Mono", serif;
+  font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
