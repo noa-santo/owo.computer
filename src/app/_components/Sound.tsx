@@ -1,153 +1,145 @@
 "use client";
+import dynamic from "next/dynamic";
 import {useEffect, useRef, useState} from "react";
-import Lofi from "./Lofi";
 
-function playPlopSound(audioContext: AudioContext) {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+const Lofi = dynamic(() => import("./Lofi"), {ssr: false});
 
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(200, audioContext.currentTime); // Start frequency
-    gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+const WORKLET_URL = "/pink-noise-processor.js"; // prefix with your basePath if you use one
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+const workletLoaded = new WeakMap<BaseAudioContext, Promise<void>>();
 
-    oscillator.start();
-
-    oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.2);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
-
-    oscillator.stop(audioContext.currentTime + 0.2);
+async function createPinkNoise(ctx: AudioContext) {
+  let loaded = workletLoaded.get(ctx);
+  if (!loaded) {
+    loaded = ctx.audioWorklet.addModule(WORKLET_URL);
+    workletLoaded.set(ctx, loaded);
+    loaded.catch(() => workletLoaded.delete(ctx)); // allow retry after a failure
+  }
+  await loaded;
+  return new AudioWorkletNode(ctx, "pink-noise", {
+    numberOfInputs: 0,
+    outputChannelCount: [1],
+  });
 }
 
-function playPinkNoise(audioContext: AudioContext) {
-  const bufferSize = 4096
-  const pinkNoise = (function () {
-    let b0: number, b1: number, b2: number, b3: number, b4: number, b5: number, b6: number
-    b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0
-    const node = audioContext.createScriptProcessor(bufferSize, 1, 1)
-    node.onaudioprocess = function ( e ) {
-      const output = e.outputBuffer.getChannelData(0)
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1
-        b0 = 0.99886 * b0 + white * 0.0555179
-        b1 = 0.99332 * b1 + white * 0.0750759
-        b2 = 0.96900 * b2 + white * 0.1538520
-        b3 = 0.86650 * b3 + white * 0.3104856
-        b4 = 0.55000 * b4 + white * 0.5329522
-        b5 = -0.7616 * b5 - white * 0.0168980
-        output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362
-        output[i] *= 0.01
-        b6 = white * 0.115926
-      }
-    }
-    return node
-  })()
+function playPlopSound(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  const osc = new OscillatorNode(ctx, {type: "sine", frequency: 200});
+  const gain = new GainNode(ctx, {gain: 1});
 
-  const pinkNoiseGain = audioContext.createGain();
-  pinkNoiseGain.gain.setValueAtTime(0.12, audioContext.currentTime);
-  pinkNoise.connect(pinkNoiseGain).connect(audioContext.destination);
+  osc.frequency.setValueAtTime(200, now);
+  osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
+  gain.gain.setValueAtTime(1, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
-  return pinkNoise;
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.2);
+  osc.onended = () => {
+    osc.disconnect();
+    gain.disconnect();
+  };
 }
 
-function playBeep(audioContext: AudioContext) {
-  const oscillator = audioContext.createOscillator();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-
-  const oscillatorGain = audioContext.createGain();
-  oscillatorGain.gain.setValueAtTime(0.005, audioContext.currentTime);
-
-  oscillator.connect(oscillatorGain).connect(audioContext.destination);
-  oscillator.start();
-
-  return oscillator;
+function createTone(ctx: AudioContext, type: OscillatorType, frequency: number, level: number) {
+  const osc = new OscillatorNode(ctx, {type, frequency});
+  const gain = new GainNode(ctx, {gain: level});
+  osc.connect(gain);
+  osc.start();
+  return {osc, gain};
 }
 
-function playHum(audioContext: AudioContext) {
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  oscillator.type = "triangle";
-      oscillator.frequency.setValueAtTime(60, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
-
-  oscillator.connect(gainNode).connect(audioContext.destination);
-  oscillator.start();
-
-  return oscillator;
-}
-
-function fixAudioIfNeeded(audioContext: AudioContext, setAudioWorking: (working: boolean) => void) {
-  if (!audioContext) return;
-  const intervalId = setInterval(() => {
-    if (audioContext.state === "closed") {
-      clearInterval(intervalId);
-      return;
-    }
-    if (audioContext.state === "suspended") {
-      audioContext
-        .resume()
-        .then(() => {
-          setAudioWorking(true);
-          clearInterval(intervalId);
-        })
-        .catch((err) => {
-          console.error("Failed to resume audio context", err);
-        });
-    } else if (audioContext.state === "running") {
-      setAudioWorking(true);
-      clearInterval(intervalId);
-    }
-  }, 50);
-}
-export default function Sound({ crtEffect, text }: { crtEffect: boolean, text: string }) {
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const initalLoad = useRef(true);
+export default function Sound({crtEffect, text}: { crtEffect: boolean; text: string }) {
+  const [ctx, setCtx] = useState<AudioContext | null>(null);
   const [audioWorking, setAudioWorking] = useState(false);
+  const prevText = useRef(text);
 
-    useEffect(() => {
-        if (!audioContextRef.current) {
-            audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        }
-        const audioContext = audioContextRef.current
-        ;if (initalLoad.current) {
-        initalLoad.current = false;
-        return;
-      }
-        playPlopSound(audioContext)
-    }, [text])
-
+  // Context lifecycle + autoplay-policy handling
   useEffect(() => {
-    if (crtEffect) {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        const gainNode = audioContextRef.current.createGain();
-        gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-        gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime + 1);
-        gainNode.connect(audioContextRef.current.destination);
-        gainNode.gain.exponentialRampToValueAtTime(1, audioContextRef.current.currentTime + 2);
-      }
-      const audioContext = audioContextRef.current;
+    const audioContext = new AudioContext();
+    setCtx(audioContext);
 
-     playPinkNoise(audioContext);
-      playBeep(audioContext);
-      playHum(audioContext);
-    }
+    const sync = () => setAudioWorking(audioContext.state === "running");
+    audioContext.addEventListener("statechange", sync);
+
+    const resume = () => {
+      if (audioContext.state === "suspended") audioContext.resume().catch(() => {
+      });
+    };
+    resume(); // works if the page already has user activation
+    window.addEventListener("pointerdown", resume);
+    window.addEventListener("keydown", resume);
+    sync();
 
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close().then();
-        audioContextRef.current = null;
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("keydown", resume);
+      audioContext.removeEventListener("statechange", sync);
+      setCtx(null);
+      setAudioWorking(false);
+      audioContext.close().catch(() => {
+      });
+    };
+  }, []);
+
+  // Plop on text change (skips the initial render)
+  useEffect(() => {
+    if (!ctx) return;
+    if (prevText.current === text) return;
+    prevText.current = text;
+    if (ctx.state === "running") playPlopSound(ctx);
+  }, [text, ctx]);
+
+  // CRT ambience
+  useEffect(() => {
+    if (!ctx || !crtEffect) return;
+
+    let cancelled = false;
+    const disposables: (() => void)[] = [];
+
+    (async () => {
+      const master = new GainNode(ctx, {gain: 0.0001});
+      master.connect(ctx.destination);
+      // Exponential ramps can't start at 0, so start near-silent
+      master.gain.setValueAtTime(0.0001, ctx.currentTime);
+      master.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 2);
+      disposables.push(() => master.disconnect());
+
+      const beep = createTone(ctx, "sine", 400, 0.005);
+      const hum = createTone(ctx, "triangle", 60, 0.05);
+      for (const {osc, gain} of [beep, hum]) {
+        gain.connect(master);
+        disposables.push(() => {
+          osc.stop();
+          osc.disconnect();
+          gain.disconnect();
+        });
       }
-    }
-  }, [crtEffect]);
 
-    useEffect(() => {
-      if (!audioContextRef.current) return;
-      fixAudioIfNeeded(audioContextRef.current, setAudioWorking);
-    }, []);
+      try {
+        const noise = await createPinkNoise(ctx);
+        if (cancelled) return noise.disconnect();
+        const noiseGain = new GainNode(ctx, {gain: 0.12});
+        noise.connect(noiseGain).connect(master);
+        disposables.push(() => {
+          noise.disconnect();
+          noiseGain.disconnect();
+        });
+      } catch (err) {
+        console.error("Failed to load pink noise worklet", err);
+      }
+    })();
 
-  return audioWorking ? <Lofi /> : null;
+    return () => {
+      cancelled = true;
+      disposables.forEach((dispose) => {
+        try {
+          dispose();
+        } catch {
+        }
+      });
+    };
+  }, [ctx, crtEffect]);
+
+  return audioWorking ? <Lofi/> : null;
 }
