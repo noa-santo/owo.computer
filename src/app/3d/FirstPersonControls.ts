@@ -7,8 +7,7 @@ import gsap from 'gsap';
 
 export default function FirstPersonControls() {
   const { camera, gl } = useThree();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [subscribeKeys, getKeyboardState] = useKeyboardControls();
+  const [,getKeyboardState] = useKeyboardControls();
 
   const isDragging = useRef(false);
   const previousMouse = useRef(new Vector2());
@@ -28,7 +27,7 @@ export default function FirstPersonControls() {
         z: finalPosition.z,
         duration: 1,
         ease: "power1.inOut"
-      });
+      }).then();
     }, 1000);
 
     const handleMouseDown = (event: { clientX: number; clientY: number; }) => {
