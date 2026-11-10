@@ -1,105 +1,142 @@
-import React, { useEffect, useRef } from 'react';
+"use client";
+import { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
-    YT: typeof YT;
-    onYouTubeIframeAPIReady: () => void;
+    YT?: typeof YT;
+    onYouTubeIframeAPIReady?: () => void;
   }
 }
 
-const Lofi = () => {
-  const playerContainerRef = useRef<HTMLDivElement>(null);
-  const playerInstanceRef = useRef<YT.Player | null>(null);
-  const isMountedRef = useRef(true);
+const VIDEO_ID = process.env.NEXT_PUBLIC_LOFI_VIDEO_ID ?? "rFZHOHl-L8A";
+const VOLUME = 20;
+const FADE_IN_MS = 2500;
+const FADE_OUT_MS = 2000;
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    let youtubeScript: HTMLScriptElement | null = null;
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
-    const initializePlayer = () => {
-      if (!isMountedRef.current || !playerContainerRef.current) return;
+function fadeVolume(player: YT.Player, to: number, ms: number, onDone?: () => void) {
+  const from = player.getVolume();
+  const start = performance.now();
+  const id = setInterval(() => {
+    const t = Math.min(1, (performance.now() - start) / ms);
+    player.setVolume(Math.round(from + (to - from) * smoothstep(t)));
+    if (t >= 1) {
+      clearInterval(id);
+      onDone?.();
+    }
+  }, 50);
+  return () => clearInterval(id);
+}
 
-      // Create temporary container outside of React's DOM
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = `
-        <iframe 
-          width="0" 
-          height="0" 
-          src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&enablejsapi=1&controls=0&mute=0"
-          allow="autoplay; encrypted-media"
-          style="display: none;"
-        ></iframe>
-      `;
+type Fade = { current: (() => void) | null };
 
-      const iframe = tempDiv.firstElementChild as HTMLIFrameElement;
+function setPlaying(player: YT.Player, on: boolean, fade: Fade) {
+  fade.current?.(); // cancels a running fade, including its pending pauseVideo
+  if (on) {
+    player.unMute();
+    player.playVideo();
+    fade.current = fadeVolume(player, VOLUME, FADE_IN_MS);
+  } else {
+    fade.current = fadeVolume(player, 0, FADE_OUT_MS, () => player.pauseVideo());
+  }
+}
 
-      // Initialize YT.Player safely
-      const onYouTubeIframeAPIReady = () => {
-        if (isMountedRef.current && iframe) {
-          playerInstanceRef.current = new window.YT.Player(iframe, {
-            events: {
-              onReady: (event) => {
-                event.target.setVolume(20);
-                event.target.playVideo();
-              }
-            }
-          });
+let apiPromise: Promise<typeof YT> | null = null;
 
-          // Attach to React's DOM after initialization
-          if (playerContainerRef.current) {
-            playerContainerRef.current.appendChild(iframe);
-          }
-        }
-      };
+function loadYouTubeApi(): Promise<typeof YT> {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (apiPromise) return apiPromise;
 
-      // Handle existing API
-      if (window.YT?.Player) {
-        onYouTubeIframeAPIReady();
-      } else {
-        window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-      }
+  apiPromise = new Promise<typeof YT>((resolve, reject) => {
+    const prev = window.onYouTubeIframeAPIReady; // stay polite to other users of the global
+    window.onYouTubeIframeAPIReady = () => {
+      prev?.();
+      resolve(window.YT!);
     };
 
-    if (!window.YT) {
-      youtubeScript = document.createElement('script');
-      youtubeScript.src = 'https://www.youtube.com/iframe_api';
-      document.body.appendChild(youtubeScript);
-    }
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    script.onerror = () => {
+      apiPromise = null;
+      script.remove();
+      reject(new Error("Failed to load the YouTube IFrame API"));
+    };
+    document.head.appendChild(script);
+  });
 
-    // Delay initialization to ensure API setup
-    const initTimeout = setTimeout(initializePlayer, 100);
+  return apiPromise;
+}
+
+export default function Lofi({ enabled }: { enabled: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YT.Player | null>(null);
+  const readyRef = useRef(false);
+  const enabledRef = useRef(enabled);
+  const fadeRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    const mount = document.createElement("div");
+    container.appendChild(mount);
+
+    loadYouTubeApi()
+      .then((yt) => {
+        if (cancelled) return;
+        playerRef.current = new yt.Player(mount, {
+          videoId: VIDEO_ID,
+          host: "https://www.youtube-nocookie.com",
+          width: 200,
+          height: 200,
+          playerVars: {
+            autoplay: 1,
+            mute: 1, // muted start is always allowed; we unmute right after
+            controls: 0,
+            disablekb: 1,
+            playsinline: 1,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (e: YT.PlayerEvent) => {
+              if (cancelled) return;
+              readyRef.current = true;
+              e.target.setVolume(0);
+              setPlaying(e.target, enabledRef.current, fadeRef);
+            },
+          onError: (e: YT.OnErrorEvent) => console.error("[lofi] error", e.data),
+          },
+        });
+      })
+      .catch((err) => console.error(err));
 
     return () => {
-      isMountedRef.current = false;
-      clearTimeout(initTimeout);
-
-      // Cleanup player
-      if (playerInstanceRef.current) {
-        try {
-          playerInstanceRef.current.destroy();
-        } catch (e) {
-          console.log('Player cleanup error:', e);
-        }
-      }
-
-      // Remove iframe manually
-      if (playerContainerRef.current) {
-        playerContainerRef.current.innerHTML = '';
-      }
-
-      // Cleanup script
-      if (youtubeScript) {
-        document.body.removeChild(youtubeScript);
-      }
-
-      // Cleanup global callback
-      if (window.onYouTubeIframeAPIReady === initializePlayer) {
-        window.onYouTubeIframeAPIReady = () => {};
-      }
+      cancelled = true;
+      readyRef.current = false;
+      fadeRef.current?.();
+      try {
+        playerRef.current?.destroy();
+    } catch {}
+      playerRef.current = null;
+      container.replaceChildren();
     };
   }, []);
 
-  return <div ref={playerContainerRef} />;
-};
+  useEffect(() => {
+    enabledRef.current = enabled;
+    if (playerRef.current && readyRef.current) {
+      setPlaying(playerRef.current, enabled, fadeRef);
+    }
+  }, [enabled]);
 
-export default Lofi;
+  return (
+    <div
+      ref={containerRef}
+      aria-hidden
+      style={{ position: "fixed", left: -9999, width: 200, height: 200, pointerEvents: "none" }}
+    />
+  );
+}

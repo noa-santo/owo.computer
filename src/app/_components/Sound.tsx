@@ -141,5 +141,20 @@ export default function Sound({crtEffect, text}: { crtEffect: boolean; text: str
     };
   }, [ctx, crtEffect]);
 
-  return audioWorking ? <Lofi/> : null;
+  const [lofiOn, setLofiOn] = useState(false);
+  const [lofiMounted, setLofiMounted] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "m" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      setLofiMounted(true);
+      setLofiOn((on) => !on);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  return audioWorking && lofiMounted ? <Lofi enabled={lofiOn} /> : null;
 }
