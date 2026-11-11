@@ -1,5 +1,5 @@
 "use client";
-import React, {useState, useEffect, useMemo, useCallback} from "react";
+import React, {useState, useEffect, useMemo, useCallback, Suspense} from "react";
 import styles from "./page.module.css";
 import CRTEffect from "./_components/CRTEffect";
 import MobileControls from "./_components/MobileControls";
@@ -77,7 +77,6 @@ export default function Home() {
     };
   }, [switchVariation, toggleCrtEffect, toggleSound, router, variants, currentSet]);
 
-  const isMobile = typeof document !== 'undefined' && 'ontouchstart' in document.documentElement;
 
   return (
     <>
@@ -95,7 +94,9 @@ export default function Home() {
           </div>
         </main>
       </div>
-      {isMobile && <MobileControls onSwitchVariation={switchVariation} onToggleCrtEffect={toggleCrtEffect} onToggleSound={toggleSound} /> }
+      <Suspense>
+        <MobileControls onSwitchVariation={switchVariation} onToggleCrtEffect={toggleCrtEffect} onToggleSound={toggleSound} />
+      </Suspense>
       {sound && <Sound crtEffect={crtEffect} text={text} />}
     </>
   );

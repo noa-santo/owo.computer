@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import { TiArrowShuffle, TiDeviceDesktop, TiVolumeUp } from 'react-icons/ti';
 import styles from './MobileControls.module.css';
 
@@ -9,7 +9,12 @@ type MobileControlsProps = {
 }
 
 const MobileControls = ({ onSwitchVariation, onToggleCrtEffect, onToggleSound }: MobileControlsProps) => {
-  return (
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile('ontouchstart' in document.documentElement)
+  }, []);
+
+  return isMobile ? (
     <div className={styles.mobileControls}>
       <button onClick={onSwitchVariation}>
         <TiArrowShuffle />
@@ -21,7 +26,7 @@ const MobileControls = ({ onSwitchVariation, onToggleCrtEffect, onToggleSound }:
         <TiVolumeUp />
       </button>
     </div>
-  );
+  ) : null;
 };
 
 export default MobileControls;
