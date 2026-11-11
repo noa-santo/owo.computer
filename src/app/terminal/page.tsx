@@ -1,8 +1,9 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import CRTEffect from "@/app/_components/CRTEffect";
+import { StateContext } from "@/app/_components/StateContext";
 import { Terminal } from "@/lib/terminal/Terminal";
 import styles from "./page.module.css";
 
@@ -13,6 +14,7 @@ interface OutputLine {
 }
 
 export default function TerminalPage() {
+	const { crt, toggleCrt } = useContext(StateContext);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const outputEndRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
@@ -79,7 +81,11 @@ export default function TerminalPage() {
 		setHistoryIndex(-1);
 
 		const currentPrompt = `>`;
-		const result = terminalRef.current.executeCommand(trimmed);
+		let result = terminalRef.current.executeCommand(trimmed);
+		if (result === "\x1bcrt") {
+			toggleCrt()
+			result = ""
+		}
 		if (result === "\x1bc") {
 			setOutput([]);
 			return;
@@ -122,37 +128,40 @@ export default function TerminalPage() {
 	};
 
 	return (
-		<div className={styles.container}>
-			<main>
-				<h1>OwO computer</h1>
-				<p>hewwo UwU</p>
-				<br />
-				<div className={styles.terminal}>
-					<div className={styles.outputContainer}>
-						{output.map((line) => (
-							<div key={line.id} className={styles.line}>
-								{line.prompt && (
-									<span className={styles.prompt}>{line.prompt} </span>
-								)}
-								<span style={{ whiteSpace: "pre-wrap" }}>{line.text}</span>
-							</div>
-						))}
-						<div ref={outputEndRef} />
-					</div>
+		<>
+			{crt && <CRTEffect />}
+			<div className={styles.container}>
+				<main>
+					<h1>OwO computer</h1>
+					<p>hewwo UwU</p>
+					<br />
+					<div className={styles.terminal}>
+						<div className={styles.outputContainer}>
+							{output.map((line) => (
+								<div key={line.id} className={styles.line}>
+									{line.prompt && (
+										<span className={styles.prompt}>{line.prompt} </span>
+									)}
+									<span style={{ whiteSpace: "pre-wrap" }}>{line.text}</span>
+								</div>
+							))}
+							<div ref={outputEndRef} />
+						</div>
 
-					<div className={styles.inputContainer}>
-						<span>&gt;</span>
-						<input
-							type="text"
-							className={styles.input}
-							ref={inputRef}
-							onKeyDown={handleKeyDown}
-							disabled={!isReady}
-							placeholder={!isReady ? "Initializing WebAssembly..." : ""}
-						/>
+						<div className={styles.inputContainer}>
+							<span>&gt;</span>
+							<input
+								type="text"
+								className={styles.input}
+								ref={inputRef}
+								onKeyDown={handleKeyDown}
+								disabled={!isReady}
+								placeholder={!isReady ? "Initializing WebAssembly..." : ""}
+							/>
+						</div>
 					</div>
-				</div>
-			</main>
-		</div>
+				</main>
+			</div>
+		</>
 	);
 }

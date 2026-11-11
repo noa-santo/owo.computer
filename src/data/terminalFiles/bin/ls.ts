@@ -1,6 +1,5 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
-import type { Directory } from "@/lib/terminal/Filesystem";
-import {Terminal} from "@/lib/terminal/Terminal";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
+import type { Terminal } from "@/lib/terminal/Terminal";
 
 export default class Ls extends Command {
 	metadata = {
@@ -16,9 +15,14 @@ export default class Ls extends Command {
 		],
 	};
 
-	public method(terminal: Terminal, args: ArgumentMap, _env: Env, _: string): string {
+	public method(
+		terminal: Terminal,
+		args: ParsedArgs,
+		_env: Env,
+		_: string,
+	): string {
 		const fs = terminal.fs;
-		const targetPath = args.get(0) ?? ".";
+		const targetPath = (args.get(0) as string) ?? ".";
 		const cwd = terminal.currentDir;
 		const node = fs.getChildByPath(targetPath, cwd);
 

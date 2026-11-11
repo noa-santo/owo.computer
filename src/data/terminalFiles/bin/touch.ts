@@ -1,4 +1,4 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
 import type { File } from "@/lib/terminal/Filesystem";
 import { resolveNode } from "@/lib/terminal/Filesystem";
 import type { Terminal } from "@/lib/terminal/Terminal";
@@ -18,11 +18,11 @@ export default class Touch extends Command {
 
 	public method(
 		terminal: Terminal,
-		args: ArgumentMap,
+		args: ParsedArgs,
 		_env: Env,
 		_: string,
 	): string {
-		const targetPath = args.get(0);
+		const targetPath = args.get(0) as string;
 
 		if (!targetPath) {
 			return "touch: missing file operand";

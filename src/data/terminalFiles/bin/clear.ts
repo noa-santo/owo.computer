@@ -1,4 +1,4 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
 import type { Terminal } from "@/lib/terminal/Terminal";
 
 export default class Clear extends Command {
@@ -10,7 +10,7 @@ export default class Clear extends Command {
 
 	public method(
 		_terminal: Terminal,
-		_args: ArgumentMap,
+		_args: ParsedArgs,
 		_env: Env,
 		_: string,
 	): string {

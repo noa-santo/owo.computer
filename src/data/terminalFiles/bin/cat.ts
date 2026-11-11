@@ -1,11 +1,11 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
 import { resolveNode } from "@/lib/terminal/Filesystem";
 import type { Terminal } from "@/lib/terminal/Terminal";
 
 export default class Cat extends Command {
 	metadata = {
 		command: "cat",
-		description: "Concatenate files and print on the standard output.",
+		description: "Concatenate files or standard input to standard output.",
 		arguments: [
 			{
 				flag: 0,
@@ -17,11 +17,11 @@ export default class Cat extends Command {
 
 	public method(
 		terminal: Terminal,
-		args: ArgumentMap,
+		args: ParsedArgs,
 		_env: Env,
 		stdin: string,
 	): string {
-		const filePath = args.get(0);
+		const filePath = args.get(0) as string;
 
 		if (!filePath) {
 			return stdin;

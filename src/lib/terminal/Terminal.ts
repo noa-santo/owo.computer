@@ -1,5 +1,11 @@
 import * as esbuild from "esbuild-wasm";
-import type { Command, Env } from "@/lib/terminal/Command";
+import {
+	type Argument,
+	type Command,
+	type Env,
+	generateShortFlags,
+	type ParsedArgs,
+} from "@/lib/terminal/Command";
 import { Directory, type File } from "@/lib/terminal/Filesystem";
 
 const rawTerminalFiles = import.meta.glob("/src/data/terminalFiles/**/*", {
@@ -154,37 +160,115 @@ export class Terminal {
 		}
 	}
 
-	public executeCommand(rawInput: string, stdin = ""): string {
+	public executeCommand(rawInput: string): string {
 		const trimmed = rawInput.trim();
 		if (!trimmed) return "";
 
-		const parts = trimmed.split(/\s+/);
-		const cmdName = parts[0];
-		const rawArgs = parts.slice(1);
+		const pipeline = trimmed
+			.split("|")
+			.map((cmd) => cmd.trim())
+			.filter(Boolean);
+		let currentStdin = "";
 
-		const command = this.commandRegistry.get(cmdName);
-		if (!command) {
-			return `command not found: ${cmdName}`;
-		}
+		for (const commandStr of pipeline) {
+			const rawTokens = commandStr.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
+			if (rawTokens.length === 0) continue;
 
-		const argsMap = new Map<string | number, string>();
+			const cleanTokens = rawTokens.map((t) => t.replace(/^"|"$/g, ""));
+			const cmdName = cleanTokens[0];
+			const rawArgs = cleanTokens.slice(1);
 
-		// Populate default values defined in command metadata
-		command.metadata?.arguments?.forEach((arg) => {
-			if (arg.defaultValue !== undefined) {
-				argsMap.set(arg.flag, arg.defaultValue);
+			const command = this.commandRegistry.get(cmdName);
+			if (!command) {
+				return `command not found: ${cmdName}`;
 			}
-		});
 
-		// Override with provided positional arguments
-		rawArgs.forEach((arg, index) => {
-			argsMap.set(index, arg);
-		});
+			const parsedArgs = this.parseArguments(
+				command.metadata.arguments ?? [],
+				rawArgs,
+			);
 
-		try {
-			return command.method(this, argsMap, this.env, stdin);
-		} catch (err) {
-			return `Error executing command: ${err instanceof Error ? err.message : String(err)}`;
+			try {
+				currentStdin = command.method(this, parsedArgs, this.env, currentStdin);
+				if (currentStdin === "\x1bc") return "\x1bc";
+			} catch (err) {
+				return `Error executing '${cmdName}': ${err instanceof Error ? err.message : String(err)}`;
+			}
 		}
+
+		return currentStdin;
+	}
+
+	private parseArguments(spec: Argument[], rawTokens: string[]): ParsedArgs {
+		const shortToFull = new Map<string, string>();
+		const fullToShort = generateShortFlags(spec);
+		for (const [full, short] of fullToShort.entries()) {
+			shortToFull.set(short, full);
+		}
+
+		const flagsMap = new Map<string, string | boolean>();
+		const positional: string[] = [];
+
+		// Apply defaults
+		for (const arg of spec) {
+			if (typeof arg.flag === "string" && arg.defaultValue !== undefined) {
+				flagsMap.set(arg.flag, arg.defaultValue);
+			}
+		}
+
+		for (let i = 0; i < rawTokens.length; i++) {
+			const token = rawTokens[i];
+
+			if (token.startsWith("--")) {
+				const eqIdx = token.indexOf("=");
+				if (eqIdx !== -1) {
+					const flagName = token.slice(2, eqIdx);
+					const val = token.slice(eqIdx + 1);
+					flagsMap.set(flagName, val);
+				} else {
+					const flagName = token.slice(2);
+					const argDef = spec.find((a) => a.flag === flagName);
+					if (argDef && argDef.type === "string" && i + 1 < rawTokens.length) {
+						flagsMap.set(flagName, rawTokens[++i]);
+					} else {
+						flagsMap.set(flagName, true);
+					}
+				}
+			} else if (token.startsWith("-") && token.length > 1) {
+				const chars = token.slice(1).split("");
+				for (let cIdx = 0; cIdx < chars.length; cIdx++) {
+					const char = chars[cIdx];
+					const fullFlag = shortToFull.get(char) ?? char;
+					const argDef = spec.find((a) => a.flag === fullFlag);
+
+					if (argDef && argDef.type === "string") {
+						if (cIdx === chars.length - 1 && i + 1 < rawTokens.length) {
+							flagsMap.set(fullFlag, rawTokens[++i]);
+						}
+					} else {
+						flagsMap.set(fullFlag, true);
+					}
+				}
+			} else {
+				positional.push(token);
+			}
+		}
+
+		return {
+			flags: flagsMap,
+			positional,
+			get(key: string | number) {
+				if (typeof key === "number") {
+					return positional[key];
+				}
+				return flagsMap.get(key);
+			},
+			has(key: string | number) {
+				if (typeof key === "number") {
+					return 0 < key && key < positional.length;
+				}
+				return flagsMap.has(key);
+			},
+		};
 	}
 }

@@ -1,4 +1,4 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
 import { Directory, resolveNode } from "@/lib/terminal/Filesystem";
 import type { Terminal } from "@/lib/terminal/Terminal";
 
@@ -17,11 +17,11 @@ export default class Mkdir extends Command {
 
 	public method(
 		terminal: Terminal,
-		args: ArgumentMap,
+		args: ParsedArgs,
 		_env: Env,
 		_: string,
 	): string {
-		const targetPath = args.get(0);
+		const targetPath = args.get(0) as string;
 
 		if (!targetPath) {
 			return "mkdir: missing operand";

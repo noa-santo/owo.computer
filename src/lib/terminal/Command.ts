@@ -1,9 +1,10 @@
 import type { Terminal } from "@/lib/terminal/Terminal";
 
-interface Argument {
-	flag: string | number;
+export interface Argument {
+	flag: string | number; // String for options ("--line-number"), number for positional (0, 1)
 	description: string;
-	defaultValue?: string;
+	defaultValue?: string | boolean;
+	type?: "boolean" | "string";
 }
 
 interface CommandMetadata {
@@ -12,29 +13,79 @@ interface CommandMetadata {
 	arguments: Argument[];
 }
 
-export type ArgumentMap = Map<string | number, string>;
+export interface ParsedArgs {
+	flags: Map<string, string | boolean>;
+	positional: string[];
+	get(key: string | number): string | boolean | undefined;
+	has(key: string | number): boolean;
+}
 export type Env = Map<string, string[]>;
 
 export abstract class Command {
-    public abstract metadata: CommandMetadata;
+	public abstract metadata: CommandMetadata;
 	public abstract method(
 		terminal: Terminal,
-		args: ArgumentMap,
+		args: ParsedArgs,
 		env: Env,
 		stdin: string,
 	): string;
 
-    public generateHelp(argument?: string | number): string {
-		if (argument === undefined) return this.metadata.description;
+	public generateHelp(): string {
+		const flagMap = generateShortFlags(this.metadata.arguments);
+		const lines = [
+			`${this.metadata.command} - ${this.metadata.description}\n`,
+			"Options:",
+		];
 
-        const argsList = this.metadata.arguments
-            .map((a) => {
-                const flagStr = typeof a.flag === "string" ? a.flag : `[arg ${a.flag}]`;
-                const defaultStr = a.defaultValue !== undefined ? ` (default: ${a.defaultValue})` : "";
-                return `  ${flagStr}\t${a.description}${defaultStr}`;
-            })
-            .join("\n");
+		for (const arg of this.metadata.arguments) {
+			if (typeof arg.flag === "string") {
+				const short = flagMap.get(arg.flag);
+				const shortStr = short ? `-${short}, ` : "    ";
+				const defaultStr =
+					arg.defaultValue !== undefined
+						? ` (default: ${arg.defaultValue})`
+						: "";
+				lines.push(
+					`  ${shortStr}--${arg.flag.padEnd(16)} ${arg.description}${defaultStr}`,
+				);
+			}
+		}
 
-        return `${this.metadata.description}\n\nArguments:\n${argsList}`;
+		const positionals = this.metadata.arguments.filter(
+			(a) => typeof a.flag === "number",
+		);
+		if (positionals.length > 0) {
+			lines.push("\nArguments:");
+			for (const arg of positionals) {
+				lines.push(`  [arg ${arg.flag}]`.padEnd(24) + `${arg.description}`);
+			}
+		}
+
+		return lines.join("\n");
 	}
+}
+
+export function generateShortFlags(args: Argument[]): Map<string, string> {
+	const fullToShort = new Map<string, string>();
+	const usedShorts = new Set<string>();
+
+	for (const arg of args) {
+		if (typeof arg.flag !== "string") continue;
+		const full = arg.flag;
+
+		let charToUse = "";
+		for (const char of full) {
+			if (/[a-zA-Z0-9]/.test(char) && !usedShorts.has(char)) {
+				charToUse = char;
+				break;
+			}
+		}
+
+		if (charToUse) {
+			usedShorts.add(charToUse);
+			fullToShort.set(full, charToUse);
+		}
+	}
+
+	return fullToShort;
 }

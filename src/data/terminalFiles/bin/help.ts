@@ -1,4 +1,4 @@
-import { type ArgumentMap, Command, type Env } from "@/lib/terminal/Command";
+import { Command, type Env, type ParsedArgs } from "@/lib/terminal/Command";
 import type { Terminal } from "@/lib/terminal/Terminal";
 
 export default class Help extends Command {
@@ -17,11 +17,11 @@ export default class Help extends Command {
 
 	public method(
 		terminal: Terminal,
-		args: ArgumentMap,
+		args: ParsedArgs,
 		_env: Env,
 		_: string,
 	): string {
-		const target = args.get(0);
+		const target = args.get(0) as string;
 
 		if (!target || target === "all") {
 			const entries = Array.from(terminal.commandRegistry.entries());
@@ -43,6 +43,6 @@ export default class Help extends Command {
 			return `help: no help topics match '${target}'`;
 		}
 
-		return `${cmd.metadata.command} - ${cmd.generateHelp(0)}`;
+		return `${cmd.metadata.command} - ${cmd.generateHelp()}`;
 	}
 }
