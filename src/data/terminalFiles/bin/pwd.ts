@@ -8,12 +8,7 @@ export default class Pwd extends Command {
 		arguments: [],
 	};
 
-	public method(
-		terminal: Terminal,
-		_args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(terminal: Terminal, _args: ParsedArgs, _: string): string {
 		return terminal.currentDir.getAbsolutePath();
 	}
 }

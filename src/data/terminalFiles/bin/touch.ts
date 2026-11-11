@@ -16,12 +16,7 @@ export default class Touch extends Command {
 		],
 	};
 
-	public method(
-		terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(terminal: Terminal, args: ParsedArgs, _: string): string {
 		const targetPath = args.get(0) as string;
 
 		if (!targetPath) {

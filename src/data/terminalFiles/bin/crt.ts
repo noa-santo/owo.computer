@@ -8,12 +8,7 @@ export default class Crt extends Command {
 		arguments: [],
 	};
 
-	public method(
-		_terminal: Terminal,
-		_args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(_terminal: Terminal, _args: ParsedArgs, _: string): string {
 		return "\x1bcrt";
 	}
 }

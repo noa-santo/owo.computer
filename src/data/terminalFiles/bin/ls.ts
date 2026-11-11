@@ -21,12 +21,7 @@ export default class Ls extends Command {
 		],
 	};
 
-	public method(
-		terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(terminal: Terminal, args: ParsedArgs, _: string): string {
 		const fs = terminal.fs;
 		const targetPath = (args.get(0) as string) ?? ".";
 		const cwd = terminal.currentDir;

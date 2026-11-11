@@ -14,12 +14,7 @@ export default class Echo extends Command {
 		],
 	};
 
-	public method(
-		_terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(_terminal: Terminal, args: ParsedArgs, _: string): string {
 		return args.positional.join(" ");
 	}
 }

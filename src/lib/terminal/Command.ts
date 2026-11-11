@@ -26,7 +26,6 @@ export abstract class Command {
 	public abstract method(
 		terminal: Terminal,
 		args: ParsedArgs,
-		env: Env,
 		stdin: string,
 	): string;
 

@@ -9,13 +9,8 @@ export default class History extends Command {
 		arguments: [],
 	};
 
-	public method(
-		terminal: Terminal,
-		_args: ParsedArgs,
-		env: Env,
-		_stdin: string,
-	): string {
-		const homePaths = env.get("HOME");
+	public method(terminal: Terminal, _args: ParsedArgs, _stdin: string): string {
+		const homePaths = terminal.env.get("HOME");
 		const homePath =
 			homePaths && homePaths.length > 0 ? homePaths[0] : "/home/owo";
 		const historyFilePath = `${homePath}/.history`;

@@ -50,12 +50,7 @@ export default class Grep extends Command {
 		],
 	};
 
-	public method(
-		terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		stdin: string,
-	): string {
+	public method(terminal: Terminal, args: ParsedArgs, stdin: string): string {
 		const pattern = args.get(0) as string | undefined;
 		const filePath = args.get(1) as string | undefined;
 

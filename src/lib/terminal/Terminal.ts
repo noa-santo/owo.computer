@@ -293,7 +293,16 @@ export class Terminal {
 			const rawTokens = pipeSegment.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
 			if (rawTokens.length === 0) continue;
 
-			const cleanTokens = rawTokens.map((t) => t.replace(/^"|"$/g, ""));
+			const cleanTokens = rawTokens.map((t) => {
+				let str = t.replace(/^"|"$/g, "");
+
+				str = str.replace(/\$([A-Za-z0-9_]+)/g, (_, varName) => {
+					const vals = this.env.get(varName);
+					return vals ? vals.join(":") : "";
+				});
+
+				return str;
+			});
 			const cmdName = cleanTokens[0];
 			const rawArgs = cleanTokens.slice(1);
 

@@ -15,12 +15,7 @@ export default class Help extends Command {
 		],
 	};
 
-	public method(
-		terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		_: string,
-	): string {
+	public method(terminal: Terminal, args: ParsedArgs, _: string): string {
 		const target = args.get(0) as string;
 
 		if (!target || target === "all") {

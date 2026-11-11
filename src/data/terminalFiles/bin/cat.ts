@@ -15,12 +15,7 @@ export default class Cat extends Command {
 		],
 	};
 
-	public method(
-		terminal: Terminal,
-		args: ParsedArgs,
-		_env: Env,
-		stdin: string,
-	): string {
+	public method(terminal: Terminal, args: ParsedArgs, stdin: string): string {
 		const filePath = args.get(0) as string;
 
 		if (!filePath) {
