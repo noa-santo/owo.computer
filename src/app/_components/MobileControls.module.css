@@ -6,16 +6,18 @@
   background: rgba(0, 0, 0, 0.8);
   padding: 10px;
   border-radius: 5px;
+  pointer-events: none;
   z-index: 200;
 }
 
 .mobileControls button {
-    background: var(--background);
-    border-radius: 4px;
-  aspect-ratio: 1/1;
+  pointer-events: auto;
+  background: var(--background);
+  border-radius: 4px;
+  aspect-ratio: 1 / 1;
   border: none;
   padding: 8px;
   font-size: 16px;
   cursor: pointer;
-    margin: 0 5px;
+  margin: 0 4px;
 }
