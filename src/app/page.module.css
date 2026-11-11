@@ -1,17 +1,17 @@
 .page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100%;
 }
 
 .owo {
-  font-size: 12rem;
-  font-optical-sizing: auto;
-  font-weight: 400;
-  font-style: normal;
+	font-size: 12rem;
+	font-optical-sizing: auto;
+	font-weight: 400;
+	font-style: normal;
 
-  @media (max-width: 800px) {
-    font-size: 8rem;
-  }
+	@media (max-width: 800px) {
+		font-size: 8rem;
+	}
 }

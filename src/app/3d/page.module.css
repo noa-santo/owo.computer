@@ -1,20 +1,21 @@
 .crtScreen {
-  width: 1200px;
-  height: 900px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+	width: 1200px;
+	height: 900px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
 
 .crtScreen iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
+	width: 100%;
+	height: 100%;
+	border: none;
 }
 
 .fullscreenCanvas {
-  position: fixed !important;
-  top: 0;
-  left: 0;
-  z-index: -1;
+	/* biome-ignore lint/complexity/noImportantStyles: needed here*/
+	position: fixed !important;
+	top: 0;
+	left: 0;
+	z-index: -1;
 }

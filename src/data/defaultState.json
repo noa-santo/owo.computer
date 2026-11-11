@@ -1,6 +1,6 @@
 {
-  "crt": true,
-  "sound": true,
-  "music": false,
-  "variantSet": "happy"
+	"crt": true,
+	"sound": true,
+	"music": false,
+	"variantSet": "happy"
 }

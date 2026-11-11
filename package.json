@@ -25,6 +25,7 @@
     "tone": "^15.1.22"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
     "@eslint/eslintrc": "^3.3.7",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
