@@ -6,7 +6,7 @@ import {
 	generateShortFlags,
 	type ParsedArgs,
 } from "@/lib/terminal/Command";
-import { Directory, type File } from "@/lib/terminal/Filesystem";
+import { Directory, type File, writeFile } from "@/lib/terminal/Filesystem";
 
 const rawTerminalFiles = import.meta.glob("/src/data/terminalFiles/**/*", {
 	query: "?raw",
@@ -164,14 +164,24 @@ export class Terminal {
 		const trimmed = rawInput.trim();
 		if (!trimmed) return "";
 
-		const pipeline = trimmed
+		let commandStr = trimmed;
+		let redirectTarget: string | null = null;
+		let isAppend = false;
+		const redirectMatch = commandStr.match(/(>>|>)\s*(\S+)$/);
+		if (redirectMatch) {
+			isAppend = redirectMatch[1] === ">>";
+			redirectTarget = redirectMatch[2];
+			commandStr = commandStr.slice(0, redirectMatch.index).trim();
+		}
+
+		const pipeline = commandStr
 			.split("|")
 			.map((cmd) => cmd.trim())
 			.filter(Boolean);
 		let currentStdin = "";
 
-		for (const commandStr of pipeline) {
-			const rawTokens = commandStr.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
+		for (const pipeSegment of pipeline) {
+			const rawTokens = pipeSegment.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
 			if (rawTokens.length === 0) continue;
 
 			const cleanTokens = rawTokens.map((t) => t.replace(/^"|"$/g, ""));
@@ -193,6 +203,15 @@ export class Terminal {
 				if (currentStdin === "\x1bc") return "\x1bc";
 			} catch (err) {
 				return `Error executing '${cmdName}': ${err instanceof Error ? err.message : String(err)}`;
+			}
+		}
+
+		if (redirectTarget) {
+			try {
+				writeFile(this, redirectTarget, currentStdin, isAppend);
+				return "";
+			} catch (err) {
+				return `owo: ${err instanceof Error ? err.message : String(err)}`;
 			}
 		}
 

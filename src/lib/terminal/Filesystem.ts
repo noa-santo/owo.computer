@@ -1,3 +1,5 @@
+import type { Terminal } from "@/lib/terminal/Terminal";
+
 export interface Directory {
 	type: "directory";
 	name: string;
@@ -75,4 +77,48 @@ export function resolveNode(
 	pathStr: string,
 ): Directory | File | null {
 	return terminal.fs.getChildByPath(pathStr, terminal.currentDir);
+}
+
+export function writeFile(
+	terminal: Terminal,
+	targetPath: string,
+	content: string,
+	append = false,
+): void {
+	const parts = targetPath.split("/").filter(Boolean);
+	if (parts.length === 0) throw new Error(`${targetPath}: Is a directory`);
+
+	const fileName = parts.pop()!;
+	const parentPath = targetPath.startsWith("/")
+		? `/${parts.join("/")}`
+		: parts.join("/");
+
+	const parentNode =
+		parts.length === 0
+			? terminal.currentDir
+			: resolveNode(terminal, parentPath);
+
+	if (parentNode?.type !== "directory") {
+		throw new Error(`${targetPath}: No such file or directory`);
+	}
+
+	const existingChild = parentNode.children.find((c) => c.name === fileName);
+
+	if (existingChild) {
+		if (existingChild.type === "directory") {
+			throw new Error(`${targetPath}: Is a directory`);
+		}
+		existingChild.content = append
+			? existingChild.content
+				? `${existingChild.content}\n${content}`
+				: content
+			: content;
+	} else {
+		const newFile: File = {
+			type: "file",
+			name: fileName,
+			content,
+		};
+		parentNode.children.push(newFile);
+	}
 }

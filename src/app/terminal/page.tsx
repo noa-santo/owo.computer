@@ -52,9 +52,7 @@ export default function TerminalPage() {
 	}, []);
 
 	useEffect(() => {
-		if (isReady) {
-			inputRef.current?.focus();
-		}
+		if (isReady) inputRef.current?.focus();
 	}, [isReady]);
 
 	useEffect(() => {
@@ -63,7 +61,6 @@ export default function TerminalPage() {
 				inputRef.current?.focus();
 			}
 		};
-
 		window.addEventListener("keydown", handleGlobalKeyDown);
 		return () => window.removeEventListener("keydown", handleGlobalKeyDown);
 	}, []);
@@ -83,8 +80,8 @@ export default function TerminalPage() {
 		const currentPrompt = `>`;
 		let result = terminalRef.current.executeCommand(trimmed);
 		if (result === "\x1bcrt") {
-			toggleCrt()
-			result = ""
+			toggleCrt();
+			result = "";
 		}
 		if (result === "\x1bc") {
 			setOutput([]);
@@ -98,8 +95,58 @@ export default function TerminalPage() {
 		]);
 	};
 
+	const handleAutocomplete = (inputValue: string) => {
+		if (!terminalRef.current) return inputValue;
+		const term = terminalRef.current;
+
+		const tokens = inputValue.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+		const endsWithSpace = inputValue.endsWith(" ");
+		const currentToken = endsWithSpace ? "" : tokens[tokens.length - 1] || "";
+
+		// 1. Command Autocomplete (First token)
+		if (tokens.length <= 1 && !endsWithSpace) {
+			const cmds = Array.from(term.commandRegistry.keys());
+			const matches = cmds.filter((c) => c.startsWith(currentToken));
+			if (matches.length === 1) return matches[0] + " ";
+			return inputValue;
+		}
+
+		// 2. File/Path Autocomplete
+		const lastSlash = currentToken.lastIndexOf("/");
+		const dirPath = lastSlash !== -1 ? currentToken.slice(0, lastSlash) : ".";
+		const prefix =
+			lastSlash !== -1 ? currentToken.slice(lastSlash + 1) : currentToken;
+
+		const dirNode = term.fs.getChildByPath(dirPath, term.currentDir);
+
+		if (dirNode && dirNode.type === "directory") {
+			const matches = dirNode.children.filter((c) => c.name.startsWith(prefix));
+			if (matches.length === 1) {
+				const match = matches[0];
+				const replacementPath =
+					(lastSlash !== -1 ? currentToken.slice(0, lastSlash + 1) : "") +
+					match.name +
+					(match.type === "directory" ? "/" : " ");
+
+				if (endsWithSpace) {
+					return inputValue + replacementPath;
+				} else {
+					return (
+						inputValue.slice(0, inputValue.length - currentToken.length) +
+						replacementPath
+					);
+				}
+			}
+		}
+
+		return inputValue;
+	};
+
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-		if (event.key === "Enter") {
+		if (event.key === "Tab") {
+			event.preventDefault();
+			event.currentTarget.value = handleAutocomplete(event.currentTarget.value);
+		} else if (event.key === "Enter") {
 			handleCommand(event.currentTarget.value);
 			event.currentTarget.value = "";
 		} else if (event.key === "ArrowUp") {
@@ -115,7 +162,6 @@ export default function TerminalPage() {
 		} else if (event.key === "ArrowDown") {
 			event.preventDefault();
 			if (historyIndex === -1) return;
-
 			const nextIndex = historyIndex + 1;
 			if (nextIndex >= history.length) {
 				setHistoryIndex(-1);
