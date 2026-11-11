@@ -20,12 +20,6 @@ export default class Echo extends Command {
 		_env: Env,
 		_: string,
 	): string {
-		const values: string[] = [];
-		let i = 0;
-		while (args.has(i)) {
-			values.push(args.get(i)! as string);
-			i++;
-		}
-		return values.join(" ");
+		return args.positional.join(" ");
 	}
 }

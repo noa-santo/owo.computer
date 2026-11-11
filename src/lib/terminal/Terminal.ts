@@ -377,7 +377,7 @@ export class Terminal {
 			},
 			has(key: string | number) {
 				if (typeof key === "number") {
-					return 0 < key && key < positional.length;
+					return 0 <= key && key < positional.length;
 				}
 				return flagsMap.has(key);
 			},
