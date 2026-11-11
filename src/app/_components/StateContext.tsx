@@ -1,6 +1,12 @@
 "use client";
 import type React from "react";
-import { createContext, useCallback, useMemo, useState } from "react";
+import {
+	createContext,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import defaultState from "@/data/defaultState.json";
 import type variants from "@/data/variants.json";
 
@@ -26,14 +32,36 @@ export const StateProvider = ({ children }: { children: React.ReactNode }) => {
 	const [variantSet, setVariantSet] = useState<keyof typeof variants>(
 		defaultState.variantSet as keyof typeof variants,
 	);
+    const [hasHydrated, setHasHydrated] = useState<boolean>(false);
+
+	useEffect(() => {
+		const storedState = localStorage.getItem("appState");
+		if (storedState) {
+			const parsedState = JSON.parse(storedState);
+			setCrt(parsedState.crt);
+			setSound(parsedState.sound);
+			setMusic(parsedState.music);
+			setVariantSet(parsedState.variantSet);
+		}
+        setHasHydrated(true);
+	}, []);
+
+	useEffect(() => {
+        if (!hasHydrated) return;
+
+		localStorage.setItem(
+			"appState",
+			JSON.stringify({ crt, sound, music, variantSet }),
+		);
+    }, [crt, sound, music, variantSet, hasHydrated]);
 
 	const toggleCrt = useCallback(() => {
-		setCrt(!crt);
-	}, [crt]);
+		setCrt((prev) => !prev);
+	}, []);
 
 	const toggleSound = useCallback(() => {
-		setSound(!sound);
-	}, [sound]);
+		setSound((prev) => !prev);
+	}, []);
 
 	const value = useMemo(
 		() => ({
