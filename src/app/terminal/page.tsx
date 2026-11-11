@@ -13,6 +13,12 @@ interface OutputLine {
 	text: string;
 }
 
+async function getHistory(terminal: Terminal | null) {
+	if (!terminal) return [];
+	const result = await terminal.executeCommand("history", true);
+	return result.split("\n");
+}
+
 export default function TerminalPage() {
 	const { crt, toggleCrt } = useContext(StateContext);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +54,7 @@ export default function TerminalPage() {
 					text: "Terminal ready. Type 'help' for commands.",
 				},
 			]);
+			getHistory(term).then(setHistory);
 		});
 	}, []);
 
@@ -70,15 +77,12 @@ export default function TerminalPage() {
 		outputEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [output]);
 
-	const handleCommand = (rawInput: string) => {
+	const handleCommand = async (rawInput: string) => {
 		const trimmed = rawInput.trim();
 		if (!trimmed || !terminalRef.current) return;
 
-		setHistory((prev) => [...prev, trimmed]);
-		setHistoryIndex(-1);
-
 		const currentPrompt = `>`;
-		let result = terminalRef.current.executeCommand(trimmed);
+		let result = await terminalRef.current.executeCommand(trimmed);
 		if (result === "\x1bcrt") {
 			toggleCrt();
 			result = "";
@@ -87,6 +91,9 @@ export default function TerminalPage() {
 			setOutput([]);
 			return;
 		}
+
+		getHistory(terminalRef.current).then(setHistory);
+		setHistoryIndex(-1);
 
 		setOutput((prev) => [
 			...prev,
@@ -103,15 +110,13 @@ export default function TerminalPage() {
 		const endsWithSpace = inputValue.endsWith(" ");
 		const currentToken = endsWithSpace ? "" : tokens[tokens.length - 1] || "";
 
-		// 1. Command Autocomplete (First token)
 		if (tokens.length <= 1 && !endsWithSpace) {
 			const cmds = Array.from(term.commandRegistry.keys());
 			const matches = cmds.filter((c) => c.startsWith(currentToken));
-			if (matches.length === 1) return matches[0] + " ";
+			if (matches.length === 1) return `${matches[0]} `;
 			return inputValue;
 		}
 
-		// 2. File/Path Autocomplete
 		const lastSlash = currentToken.lastIndexOf("/");
 		const dirPath = lastSlash !== -1 ? currentToken.slice(0, lastSlash) : ".";
 		const prefix =
@@ -147,7 +152,7 @@ export default function TerminalPage() {
 			event.preventDefault();
 			event.currentTarget.value = handleAutocomplete(event.currentTarget.value);
 		} else if (event.key === "Enter") {
-			handleCommand(event.currentTarget.value);
+			handleCommand(event.currentTarget.value).then();
 			event.currentTarget.value = "";
 		} else if (event.key === "ArrowUp") {
 			event.preventDefault();

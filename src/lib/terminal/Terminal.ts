@@ -8,6 +8,13 @@ import {
 } from "@/lib/terminal/Command";
 import { Directory, type File, writeFile } from "@/lib/terminal/Filesystem";
 
+interface SerializedNode {
+	type: "directory" | "file";
+	name: string;
+	content?: string;
+	children?: SerializedNode[];
+}
+
 const rawTerminalFiles = import.meta.glob("/src/data/terminalFiles/**/*", {
 	query: "?raw",
 	import: "default",
@@ -28,19 +35,96 @@ export class Terminal {
 	public constructor() {
 		this.env = new Map<string, string[]>();
 		this.fs = new Directory();
-		this.loadDefaultFs();
-
-		const homeDir = this.fs.getChildByPath("/home/owo");
-		this.currentDir =
-			homeDir && homeDir.type === "directory" ? homeDir : this.fs;
-
+		this.currentDir = this.fs;
 		this.env.set("PATH", ["/bin"]);
+		this.env.set("HOME", ["/home/owo"]);
 		this.commandRegistry = new Map<string, Command>();
 	}
 
 	public async init(): Promise<void> {
 		await Terminal.initEsbuild();
+
+		const savedState = localStorage.getItem("owo_terminal_state");
+		if (savedState) {
+			this.loadState(savedState);
+		} else {
+			this.loadDefaultFs();
+			const homeDir = this.fs.getChildByPath(
+				this.env.get("HOME")?.at(0) ?? "/home/owo",
+			);
+			this.currentDir =
+				homeDir && homeDir.type === "directory" ? homeDir : this.fs;
+		}
+
 		await this.buildCommandRegistry();
+	}
+
+	private saveState(): void {
+		try {
+			const state = {
+				fs: this.serializeNode(this.fs),
+				cwd: this.currentDir.getAbsolutePath(),
+				env: Array.from(this.env.entries()),
+			};
+			localStorage.setItem("owo_terminal_state", JSON.stringify(state));
+		} catch (err) {
+			console.error("Failed to save terminal state", err);
+		}
+	}
+
+	private loadState(jsonState: string): void {
+		try {
+			const state = JSON.parse(jsonState);
+			this.fs = new Directory();
+			this.fs.name = "/";
+			if (state.env) {
+				this.env = new Map(state.env);
+			} else {
+				this.env.set("PATH", ["/bin"]);
+				this.env.set("HOME", ["/home/owo"]);
+			}
+
+			if (state.fs?.children) {
+				state.fs.children.forEach((child: SerializedNode) =>
+					this.deserializeNode(child, this.fs),
+				);
+			}
+
+			const cwdNode = this.fs.getChildByPath(state.cwd);
+			this.currentDir =
+				cwdNode && cwdNode.type === "directory" ? cwdNode : this.fs;
+		} catch (err) {
+			console.error(
+				"Failed to load terminal state, resetting to default.",
+				err,
+			);
+			this.loadDefaultFs();
+		}
+	}
+
+	private serializeNode(node: Directory | File): SerializedNode {
+		if (node.type === "file") {
+			return { type: "file", name: node.name, content: node.content };
+		} else {
+			return {
+				type: "directory",
+				name: node.name,
+				children: node.children.map((c) => this.serializeNode(c)),
+			};
+		}
+	}
+
+	private deserializeNode(data: SerializedNode, parent: Directory): void {
+		if (data.type === "directory") {
+			const dir = new Directory(parent, data.name);
+			data.children?.forEach((child) => this.deserializeNode(child, dir));
+		} else {
+			parent.children.push({
+				type: "file",
+				name: data.name,
+				content: data.content || "",
+			});
+		}
 	}
 
 	private static initEsbuild(): Promise<void> {
@@ -60,28 +144,18 @@ export class Terminal {
 			const parts = relativePath.split("/").filter(Boolean);
 
 			let currentDir = this.fs;
-
 			for (let i = 0; i < parts.length; i++) {
 				const part = parts[i];
 				const isLast = i === parts.length - 1;
 
 				if (isLast) {
-					const file: File = {
-						type: "file",
-						name: part,
-						content,
-					};
-					currentDir.children.push(file);
+					currentDir.children.push({ type: "file", name: part, content });
 				} else {
 					let subDir = currentDir.children.find(
 						(child): child is Directory =>
 							child.type === "directory" && child.name === part,
 					);
-
-					if (!subDir) {
-						subDir = new Directory(currentDir, part);
-					}
-
+					if (!subDir) subDir = new Directory(currentDir, part);
 					currentDir = subDir;
 				}
 			}
@@ -160,9 +234,24 @@ export class Terminal {
 		}
 	}
 
-	public executeCommand(rawInput: string): string {
+	public async executeCommand(
+		rawInput: string,
+		excludeFromHistory = false,
+	): Promise<string> {
+		await this.buildCommandRegistry();
 		const trimmed = rawInput.trim();
 		if (!trimmed) return "";
+
+		if (!excludeFromHistory) {
+			const homePaths = this.env.get("HOME");
+			const homePath =
+				homePaths && homePaths.length > 0 ? homePaths[0] : "/home/owo";
+			try {
+				writeFile(this, `${homePath}/.history`, trimmed, true);
+			} catch (err) {
+				console.error("Failed to write to .history file:", err);
+			}
+		}
 
 		let commandStr = trimmed;
 		let redirectTarget: string | null = null;
@@ -200,7 +289,10 @@ export class Terminal {
 
 			try {
 				currentStdin = command.method(this, parsedArgs, this.env, currentStdin);
-				if (currentStdin === "\x1bc") return "\x1bc";
+				if (currentStdin === "\x1bc") {
+					this.saveState();
+					return "\x1bc";
+				}
 			} catch (err) {
 				return `Error executing '${cmdName}': ${err instanceof Error ? err.message : String(err)}`;
 			}
@@ -209,12 +301,13 @@ export class Terminal {
 		if (redirectTarget) {
 			try {
 				writeFile(this, redirectTarget, currentStdin, isAppend);
-				return "";
+				currentStdin = "";
 			} catch (err) {
-				return `owo: ${err instanceof Error ? err.message : String(err)}`;
+				currentStdin = `owo: ${err instanceof Error ? err.message : String(err)}`;
 			}
 		}
 
+		this.saveState();
 		return currentStdin;
 	}
 
