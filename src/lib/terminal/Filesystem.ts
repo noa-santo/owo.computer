@@ -70,6 +70,7 @@ export type File = {
 	type: "file";
 	name: string;
 	content: string;
+	bundled?: boolean;
 };
 
 export function resolveNode(

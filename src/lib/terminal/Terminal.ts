@@ -43,12 +43,19 @@ export class Terminal {
 
 	public async init(): Promise<void> {
 		await Terminal.initEsbuild();
+		this.loadDefaultFs();
 
 		const savedState = localStorage.getItem("owo_terminal_state");
 		if (savedState) {
 			this.loadState(savedState);
+		}
+
+		const stateObj = savedState ? JSON.parse(savedState) : null;
+		if (stateObj?.cwd) {
+			const cwdNode = this.fs.getChildByPath(stateObj.cwd);
+			this.currentDir =
+				cwdNode && cwdNode.type === "directory" ? cwdNode : this.fs;
 		} else {
-			this.loadDefaultFs();
 			const homeDir = this.fs.getChildByPath(
 				this.env.get("HOME")?.at(0) ?? "/home/owo",
 			);
@@ -61,8 +68,10 @@ export class Terminal {
 
 	private saveState(): void {
 		try {
+			const fsState = this.serializeNode(this.fs);
+			if (!fsState) return;
 			const state = {
-				fs: this.serializeNode(this.fs),
+				fs: fsState,
 				cwd: this.currentDir.getAbsolutePath(),
 				env: Array.from(this.env.entries()),
 			};
@@ -75,8 +84,6 @@ export class Terminal {
 	private loadState(jsonState: string): void {
 		try {
 			const state = JSON.parse(jsonState);
-			this.fs = new Directory();
-			this.fs.name = "/";
 			if (state.env) {
 				this.env = new Map(state.env);
 			} else {
@@ -89,41 +96,49 @@ export class Terminal {
 					this.deserializeNode(child, this.fs),
 				);
 			}
-
-			const cwdNode = this.fs.getChildByPath(state.cwd);
-			this.currentDir =
-				cwdNode && cwdNode.type === "directory" ? cwdNode : this.fs;
 		} catch (err) {
-			console.error(
-				"Failed to load terminal state, resetting to default.",
-				err,
-			);
-			this.loadDefaultFs();
+			console.error("Failed to load terminal state", err);
 		}
 	}
 
-	private serializeNode(node: Directory | File): SerializedNode {
+	private serializeNode(node: Directory | File): SerializedNode | null {
 		if (node.type === "file") {
+			if (node.bundled) return null; // Skip bundled files
 			return { type: "file", name: node.name, content: node.content };
 		} else {
+			const children = node.children
+				.map((c) => this.serializeNode(c))
+				.filter((c): c is SerializedNode => c !== null);
 			return {
 				type: "directory",
 				name: node.name,
-				children: node.children.map((c) => this.serializeNode(c)),
+				children: children,
 			};
 		}
 	}
 
 	private deserializeNode(data: SerializedNode, parent: Directory): void {
 		if (data.type === "directory") {
-			const dir = new Directory(parent, data.name);
-			data.children?.forEach((child) => this.deserializeNode(child, dir));
+			let dir = parent.children.find(
+				(c) => c.type === "directory" && c.name === data.name,
+			) as Directory | undefined;
+			if (!dir) {
+				dir = new Directory(parent, data.name);
+			}
+			data.children?.forEach((child) => this.deserializeNode(child, dir!));
 		} else {
-			parent.children.push({
-				type: "file",
-				name: data.name,
-				content: data.content || "",
-			});
+			const file = parent.children.find(
+				(c) => c.type === "file" && c.name === data.name,
+			) as File | undefined;
+			if (file) {
+				file.content = data.content || "";
+			} else {
+				parent.children.push({
+					type: "file",
+					name: data.name,
+					content: data.content || "",
+				});
+			}
 		}
 	}
 
@@ -149,7 +164,12 @@ export class Terminal {
 				const isLast = i === parts.length - 1;
 
 				if (isLast) {
-					currentDir.children.push({ type: "file", name: part, content });
+					currentDir.children.push({
+						type: "file",
+						name: part,
+						content,
+						bundled: true,
+					});
 				} else {
 					let subDir = currentDir.children.find(
 						(child): child is Directory =>

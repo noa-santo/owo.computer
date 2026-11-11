@@ -4,6 +4,7 @@ import type React from "react";
 import { useContext, useEffect, useRef, useState } from "react";
 import CRTEffect from "@/app/_components/CRTEffect";
 import { StateContext } from "@/app/_components/StateContext";
+import { Command } from "@/lib/terminal/Command";
 import { Terminal } from "@/lib/terminal/Terminal";
 import styles from "./page.module.css";
 
@@ -83,6 +84,12 @@ export default function TerminalPage() {
 
 		const currentPrompt = `>`;
 		let result = await terminalRef.current.executeCommand(trimmed);
+		if (
+			(result as unknown as { prototype: any }).prototype instanceof Command
+		) {
+			result = String(result);
+		}
+
 		if (result === "\x1bcrt") {
 			toggleCrt();
 			result = "";
