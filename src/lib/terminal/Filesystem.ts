@@ -69,3 +69,10 @@ export type File = {
 	name: string;
 	content: string;
 };
+
+export function resolveNode(
+	terminal: Terminal,
+	pathStr: string,
+): Directory | File | null {
+	return terminal.fs.getChildByPath(pathStr, terminal.currentDir);
+}

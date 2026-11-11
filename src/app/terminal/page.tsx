@@ -1,194 +1,95 @@
 "use client";
+
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import CRTEffect from "@/app/_components/CRTEffect";
+import { Terminal } from "@/lib/terminal/Terminal";
 import styles from "./page.module.css";
 
-type Command = {
-	description: string;
-	execute: (args: string[]) => string | void;
-};
-
-type FileSystemNode = {
-	type: "file" | "directory";
-	name: string;
-	content?: string;
-	children?: { [key: string]: FileSystemNode };
-};
-
-const commandRegistry: { [key: string]: Command } = {};
-
-const registerCommand = (
-	name: string,
-	description: string,
-	execute: (args: string[]) => string | void,
-) => {
-	commandRegistry[name] = { description, execute };
-};
-
-const root: FileSystemNode = {
-	type: "directory",
-	name: "",
-	children: {},
-};
-
-let currentDirectory = root;
-
-registerCommand("ls", "Lists directory contents", () => {
-	if (currentDirectory.children) {
-		return Object.keys(currentDirectory.children).join("\n");
-	}
-	return "";
-});
-registerCommand("cd", "Changes directory", (args: string[]) => {
-	if (args.length === 0) return "No directory specified";
-	const dirName = args[0];
-	if (dirName === "..") {
-		if (currentDirectory.name !== "") {
-			currentDirectory = root; // Simplified for this example
-		}
-	} else if (
-		currentDirectory.children?.[dirName] &&
-		currentDirectory.children[dirName].type === "directory"
-	) {
-		currentDirectory = currentDirectory.children[dirName];
-	} else {
-		return `Directory not found: ${dirName}`;
-	}
-	return "";
-});
-registerCommand("mkdir", "Creates a new directory", (args: string[]) => {
-	if (args.length === 0) return "No directory name specified";
-	const dirName = args[0];
-	if (currentDirectory.children && !currentDirectory.children[dirName]) {
-		currentDirectory.children[dirName] = {
-			type: "directory",
-			name: dirName,
-			children: {},
-		};
-	} else {
-		return `Directory already exists: ${dirName}`;
-	}
-	return "";
-});
-registerCommand("touch", "Creates a new file", (args: string[]) => {
-	if (args.length === 0) return "No file name specified";
-	const fileName = args[0];
-	if (currentDirectory.children && !currentDirectory.children[fileName]) {
-		currentDirectory.children[fileName] = {
-			type: "file",
-			name: fileName,
-			content: "",
-		};
-	} else {
-		return `File already exists: ${fileName}`;
-	}
-	return "";
-});
-registerCommand("cat", "Prints file content", (args) => {
-	if (args.length === 0) return "No file name specified";
-	const fileName = args[0];
-	if (
-		currentDirectory.children?.[fileName] &&
-		currentDirectory.children[fileName].type === "file"
-	) {
-		return currentDirectory.children[fileName].content;
-	}
-	return `File not found: ${fileName}`;
-});
-registerCommand("rm", "Removes a file", (args: string[]) => {
-	if (args.length === 0) return "No file name specified";
-	const fileName = args[0];
-	if (
-		currentDirectory.children?.[fileName] &&
-		currentDirectory.children[fileName].type === "file"
-	) {
-		delete currentDirectory.children[fileName];
-		return `File removed: ${fileName}`;
-	}
-	return `File not found: ${fileName}`;
-});
-registerCommand("rmdir", "Removes a directory", (args: string[]) => {
-	if (args.length === 0) return "No directory name specified";
-	const dirName = args[0];
-	if (
-		currentDirectory.children?.[dirName] &&
-		currentDirectory.children[dirName].type === "directory"
-	) {
-		delete currentDirectory.children[dirName];
-		return `Directory removed: ${dirName}`;
-	}
-	return `Directory not found: ${dirName}`;
-});
-registerCommand("pwd", "Prints the current directory path", () => {
-	let path = "";
-	let node: FileSystemNode | undefined = currentDirectory;
-	while (node && node.name !== "") {
-		path = `/${node.name}${path}`;
-		node = root;
-	}
-	return path || "/";
-});
+interface OutputLine {
+	id: string;
+	prompt?: string;
+	text: string;
+}
 
 export default function TerminalPage() {
-	const [messages, setMessages] = useState<string[]>([]);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const outputEndRef = useRef<HTMLDivElement>(null);
+	const terminalRef = useRef<Terminal | null>(null);
+	const isInitializedRef = useRef(false);
+
+	const [isReady, setIsReady] = useState(false);
 	const [history, setHistory] = useState<string[]>([]);
 	const [historyIndex, setHistoryIndex] = useState<number>(-1);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const [output, setOutput] = useState<OutputLine[]>([]);
 
 	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
+		if (isInitializedRef.current) return;
+		isInitializedRef.current = true;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: needed here to trigger on new message
-	useEffect(() => {
-		inputRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages]);
+		const term = new Terminal();
+		terminalRef.current = term;
 
-	useEffect(() => {
-		window.addEventListener("keydown", () => inputRef.current?.focus());
-		return () =>
-			window.removeEventListener("keydown", () => inputRef.current?.focus());
-	}, []);
+		setOutput([
+			{
+				id: crypto.randomUUID(),
+				text: "OwO computer - System Initializing...",
+			},
+		]);
 
-	registerCommand("echo", "Echoes the input text", (args) => args.join(" "));
-	registerCommand("clear", "Clears the terminal", () => {
-		setMessages([]);
-	});
-	registerCommand("help", "Displays this help message", () => {
-		return Object.keys(commandRegistry)
-			.map((cmd) => `${cmd}: ${commandRegistry[cmd].description}\n`)
-			.join("\n");
-	});
-
-	const handleCommand = (command: string) => {
-		const args = command.split(" ");
-		const cmd = args[0].toLowerCase();
-
-		if (cmd === "clear") {
-			commandRegistry[cmd].execute(args.slice(1));
-		} else if (commandRegistry[cmd]) {
-			const output = commandRegistry[cmd].execute(args.slice(1));
-			if (output !== undefined) {
-				const outputLines = output.split("\n");
-				setMessages((prevMessages) => [
-					...prevMessages,
-					`> ${command}`,
-					...outputLines,
-				]);
-			} else {
-				setMessages((prevMessages) => [...prevMessages, `> ${command}`]);
-			}
-		} else {
-			setMessages((prevMessages) => [
-				...prevMessages,
-				`> ${command}`,
-				`Command not found: "${cmd}"`,
+		term.init().then(() => {
+			setIsReady(true);
+			setOutput((prev) => [
+				...prev,
+				{
+					id: crypto.randomUUID(),
+					text: "Terminal ready. Type 'help' for commands.",
+				},
 			]);
+		});
+	}, []);
+
+	useEffect(() => {
+		if (isReady) {
+			inputRef.current?.focus();
+		}
+	}, [isReady]);
+
+	useEffect(() => {
+		const handleGlobalKeyDown = () => {
+			if (document.activeElement !== inputRef.current) {
+				inputRef.current?.focus();
+			}
+		};
+
+		window.addEventListener("keydown", handleGlobalKeyDown);
+		return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+	}, []);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: needed here
+	useEffect(() => {
+		outputEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [output]);
+
+	const handleCommand = (rawInput: string) => {
+		const trimmed = rawInput.trim();
+		if (!trimmed || !terminalRef.current) return;
+
+		setHistory((prev) => [...prev, trimmed]);
+		setHistoryIndex(-1);
+
+		const currentPrompt = `>`;
+		const result = terminalRef.current.executeCommand(trimmed);
+		if (result === "\x1bc") {
+			setOutput([]);
+			return;
 		}
 
-		setHistory((prevHistory) => [...prevHistory, command]);
-		setHistoryIndex(-1);
+		setOutput((prev) => [
+			...prev,
+			{ id: crypto.randomUUID(), prompt: currentPrompt, text: trimmed },
+			...(result ? [{ id: crypto.randomUUID(), text: result }] : []),
+		]);
 	};
 
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -196,49 +97,62 @@ export default function TerminalPage() {
 			handleCommand(event.currentTarget.value);
 			event.currentTarget.value = "";
 		} else if (event.key === "ArrowUp") {
-			if (historyIndex < history.length - 1) {
-				const newIndex = historyIndex + 1;
-				setHistoryIndex(newIndex);
-				event.currentTarget.value = history[history.length - 1 - newIndex];
-			}
+			event.preventDefault();
+			if (history.length === 0) return;
+
+			const nextIndex =
+				historyIndex === -1
+					? history.length - 1
+					: Math.max(0, historyIndex - 1);
+			setHistoryIndex(nextIndex);
+			event.currentTarget.value = history[nextIndex] ?? "";
 		} else if (event.key === "ArrowDown") {
-			if (historyIndex > 0) {
-				const newIndex = historyIndex - 1;
-				setHistoryIndex(newIndex);
-				event.currentTarget.value = history[history.length - 1 - newIndex];
-			} else {
+			event.preventDefault();
+			if (historyIndex === -1) return;
+
+			const nextIndex = historyIndex + 1;
+			if (nextIndex >= history.length) {
 				setHistoryIndex(-1);
 				event.currentTarget.value = "";
+			} else {
+				setHistoryIndex(nextIndex);
+				event.currentTarget.value = history[nextIndex] ?? "";
 			}
 		}
 	};
 
 	return (
-		<>
-			<CRTEffect />
-			<div className={styles.container}>
-				<main>
-					<h1>OwO computer</h1>
-					<p>hewwo UwU</p>
-					<br />
-					<div className={styles.terminal}>
-						<div>
-							{messages.map((message, index) => (
-								<p key={index}>{message}</p>
-							))}
-						</div>
-						<div className={styles.inputContainer}>
-							<span>&gt;</span>
-							<input
-								type="text"
-								className={styles.input}
-								ref={inputRef}
-								onKeyDown={handleKeyDown}
-							/>
-						</div>
+		<div className={styles.container}>
+			<main>
+				<h1>OwO computer</h1>
+				<p>hewwo UwU</p>
+				<br />
+				<div className={styles.terminal}>
+					<div className={styles.outputContainer}>
+						{output.map((line) => (
+							<div key={line.id} className={styles.line}>
+								{line.prompt && (
+									<span className={styles.prompt}>{line.prompt} </span>
+								)}
+								<span style={{ whiteSpace: "pre-wrap" }}>{line.text}</span>
+							</div>
+						))}
+						<div ref={outputEndRef} />
 					</div>
-				</main>
-			</div>
-		</>
+
+					<div className={styles.inputContainer}>
+						<span>&gt;</span>
+						<input
+							type="text"
+							className={styles.input}
+							ref={inputRef}
+							onKeyDown={handleKeyDown}
+							disabled={!isReady}
+							placeholder={!isReady ? "Initializing WebAssembly..." : ""}
+						/>
+					</div>
+				</div>
+			</main>
+		</div>
 	);
 }
