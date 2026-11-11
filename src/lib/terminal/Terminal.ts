@@ -21,9 +21,12 @@ const rawTerminalFiles = import.meta.glob("/src/data/terminalFiles/**/*", {
 	eager: true,
 }) as Record<string, string>;
 
-const bundledCommands = import.meta.glob("/src/data/terminalFiles/bin/*.ts", {
-	eager: true,
-}) as Record<string, { default: new () => Command }>;
+const bundledCommands = import.meta.glob(
+	"/src/data/terminalFiles/bin/*.{ts,tsx}",
+	{
+		eager: true,
+	},
+) as Record<string, { default: new () => Command }>;
 
 export class Terminal {
 	public env: Env;
@@ -233,9 +236,9 @@ export class Terminal {
 			const files = this.collectFilesFromDir(dir);
 
 			for (const file of files) {
-				if (!file.name.endsWith(".ts")) continue;
+				if (!file.name.match(/\.tsx?$/)) continue;
 
-				const commandName = file.name.slice(0, -3);
+				const commandName = file.name.replace(/\.tsx?$/, "");
 
 				const bundledKey = Object.keys(bundledCommands).find((key) =>
 					key.endsWith(`/${file.name}`),
@@ -317,7 +320,7 @@ export class Terminal {
 			);
 
 			try {
-				currentStdin = command.method(this, parsedArgs, this.env, currentStdin);
+				currentStdin = command.method(this, parsedArgs, currentStdin);
 				if (currentStdin === "\x1bc") {
 					this.saveState();
 					return "\x1bc";

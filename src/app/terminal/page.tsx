@@ -1,6 +1,8 @@
 "use client";
 
 import type React from "react";
+import type { ReactNode } from "react";
+
 import { useContext, useEffect, useRef, useState } from "react";
 import CRTEffect from "@/app/_components/CRTEffect";
 import { StateContext } from "@/app/_components/StateContext";
@@ -11,7 +13,7 @@ import styles from "./page.module.css";
 interface OutputLine {
 	id: string;
 	prompt?: string;
-	text: string;
+	text: string | ReactNode;
 }
 
 async function getHistory(terminal: Terminal | null) {
@@ -65,7 +67,11 @@ export default function TerminalPage() {
 
 	useEffect(() => {
 		const handleGlobalKeyDown = () => {
-			if (document.activeElement !== inputRef.current) {
+			const active = document.activeElement;
+			const isEditing =
+				active?.tagName === "INPUT" || active?.tagName === "TEXTAREA";
+
+			if (!isEditing && document.activeElement !== inputRef.current) {
 				inputRef.current?.focus();
 			}
 		};
@@ -105,7 +111,7 @@ export default function TerminalPage() {
 		setOutput((prev) => [
 			...prev,
 			{ id: crypto.randomUUID(), prompt: currentPrompt, text: trimmed },
-			...(result ? [{ id: crypto.randomUUID(), text: result }] : []),
+			...(result ? [{ id: crypto.randomUUID(), text: result as any }] : []),
 		]);
 	};
 
