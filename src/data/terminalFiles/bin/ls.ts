@@ -12,6 +12,12 @@ export default class Ls extends Command {
 				description: "The directory to list the contents of.",
 				defaultValue: ".",
 			},
+			{
+				flag: "all",
+				description: "Display hidden files and dirs too.",
+				defaultValue: false,
+				type: "boolean" as const,
+			},
 		],
 	};
 
@@ -25,13 +31,17 @@ export default class Ls extends Command {
 		const targetPath = (args.get(0) as string) ?? ".";
 		const cwd = terminal.currentDir;
 		const node = fs.getChildByPath(targetPath, cwd);
+		const showAll = Boolean(args.get("all"));
 
 		if (!node) {
 			return `ls: cannot access '${targetPath}': No such file or directory`;
 		}
 
 		return node.type === "directory"
-			? node.children.map((c) => c.name).join(" ")
+			? node.children
+					.filter((c) => !c.name.startsWith(".") || showAll)
+					.map((c) => c.name)
+					.join(" ")
 			: node.name;
 	}
 }
