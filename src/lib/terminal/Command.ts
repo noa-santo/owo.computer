@@ -1,4 +1,4 @@
-import type { Directory } from "@/lib/terminal/Filesystem";
+import type { Terminal } from "@/lib/terminal/Terminal";
 
 interface Argument {
 	flag: string | number;
@@ -13,28 +13,28 @@ interface CommandMetadata {
 }
 
 export type ArgumentMap = Map<string | number, string>;
-
 export type Env = Map<string, string[]>;
 
-export interface Command {
-	metadata: CommandMetadata;
-}
-
 export abstract class Command {
+    public abstract metadata: CommandMetadata;
 	public abstract method(
-		fs: Directory,
+		terminal: Terminal,
 		args: ArgumentMap,
 		env: Env,
 		stdin: string,
 	): string;
-	public generateHelp(argument?: string | number) {
+
+    public generateHelp(argument?: string | number): string {
 		if (argument === undefined) return this.metadata.description;
-		return `${this.metadata.description}\n${
-			this.metadata.arguments.length > 0 &&
-			this.metadata.arguments.map(
-				(a) =>
-					`${typeof a.flag === "string" && a.flag}   ${a.description}   ${a.defaultValue && `Default value: ${a.defaultValue}`}`,
-			)
-		}`;
+
+        const argsList = this.metadata.arguments
+            .map((a) => {
+                const flagStr = typeof a.flag === "string" ? a.flag : `[arg ${a.flag}]`;
+                const defaultStr = a.defaultValue !== undefined ? ` (default: ${a.defaultValue})` : "";
+                return `  ${flagStr}\t${a.description}${defaultStr}`;
+            })
+            .join("\n");
+
+        return `${this.metadata.description}\n\nArguments:\n${argsList}`;
 	}
 }

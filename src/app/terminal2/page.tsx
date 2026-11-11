@@ -16,23 +16,35 @@ export default function TerminalPage() {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const outputEndRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
+	const isInitializedRef = useRef(false);
 
 	const [isReady, setIsReady] = useState(false);
 	const [history, setHistory] = useState<string[]>([]);
 	const [historyIndex, setHistoryIndex] = useState<number>(-1);
-	const [output, setOutput] = useState<OutputLine[]>([
-		{ id: "welcome", text: "OwO computer - System Initializing..." },
-	]);
+	const [output, setOutput] = useState<OutputLine[]>([]);
 
 	useEffect(() => {
+		if (isInitializedRef.current) return;
+		isInitializedRef.current = true;
+
 		const term = new Terminal();
 		terminalRef.current = term;
+
+		setOutput([
+			{
+				id: crypto.randomUUID(),
+				text: "OwO computer - System Initializing...",
+			},
+		]);
 
 		term.init().then(() => {
 			setIsReady(true);
 			setOutput((prev) => [
 				...prev,
-				{ id: "ready", text: "Terminal ready. Type 'help' for commands." },
+				{
+					id: crypto.randomUUID(),
+					text: "Terminal ready. Type 'help' for commands.",
+				},
 			]);
 		});
 	}, []);
@@ -44,7 +56,7 @@ export default function TerminalPage() {
 	}, [isReady]);
 
 	useEffect(() => {
-		const handleGlobalKeyDown = (_: KeyboardEvent) => {
+		const handleGlobalKeyDown = () => {
 			if (document.activeElement !== inputRef.current) {
 				inputRef.current?.focus();
 			}
@@ -59,69 +71,26 @@ export default function TerminalPage() {
 		outputEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [output]);
 
-	const handleCommand = async (rawInput: string) => {
+	const handleCommand = (rawInput: string) => {
 		const trimmed = rawInput.trim();
-		if (!trimmed) return;
+		if (!trimmed || !terminalRef.current) return;
 
 		setHistory((prev) => [...prev, trimmed]);
 		setHistoryIndex(-1);
 
-		const currentPrompt = `${terminalRef.current?.currentDir.name ?? "/"} >`;
+		const currentPrompt = `${terminalRef.current.currentDir.getAbsolutePath()} >`;
+		const result = terminalRef.current.executeCommand(trimmed);
 
 		setOutput((prev) => [
 			...prev,
 			{ id: crypto.randomUUID(), prompt: currentPrompt, text: trimmed },
+			...(result ? [{ id: crypto.randomUUID(), text: result }] : []),
 		]);
-
-		if (!terminalRef.current) return;
-
-		const parts = trimmed.split(/\s+/);
-		const cmdName = parts[0];
-		const rawArgs = parts.slice(1);
-
-		const command = terminalRef.current.commandRegistry.get(cmdName);
-
-		if (!command) {
-			setOutput((prev) => [
-				...prev,
-				{ id: crypto.randomUUID(), text: `command not found: ${cmdName}` },
-			]);
-			return;
-		}
-
-		const argsMap = new Map<string | number, string>();
-		rawArgs.forEach((arg, index) => {
-			argsMap.set(index, arg);
-		});
-
-		try {
-			const result = command.method(
-				terminalRef.current.fs,
-				argsMap,
-				terminalRef.current.env,
-				"",
-			);
-
-			if (result) {
-				setOutput((prev) => [
-					...prev,
-					{ id: crypto.randomUUID(), text: result },
-				]);
-			}
-		} catch (err) {
-			setOutput((prev) => [
-				...prev,
-				{
-					id: crypto.randomUUID(),
-					text: `Error executing command: ${err instanceof Error ? err.message : String(err)}`,
-				},
-			]);
-		}
 	};
 
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
 		if (event.key === "Enter") {
-			handleCommand(event.currentTarget.value).then();
+			handleCommand(event.currentTarget.value);
 			event.currentTarget.value = "";
 		} else if (event.key === "ArrowUp") {
 			event.preventDefault();
@@ -149,40 +118,37 @@ export default function TerminalPage() {
 	};
 
 	return (
-		<>
-			<CRTEffect />
-			<div className={styles.container}>
-				<main>
-					<h1>OwO computer</h1>
-					<p>hewwo UwU</p>
-					<br />
-					<div className={styles.terminal}>
-						<div className={styles.outputContainer}>
-							{output.map((line) => (
-								<div key={line.id} className={styles.line}>
-									{line.prompt && (
-										<span className={styles.prompt}>{line.prompt} </span>
-									)}
-									<span>{line.text}</span>
-								</div>
-							))}
-							<div ref={outputEndRef} />
-						</div>
-
-						<div className={styles.inputContainer}>
-							<span>&gt;</span>
-							<input
-								type="text"
-								className={styles.input}
-								ref={inputRef}
-								onKeyDown={handleKeyDown}
-								disabled={!isReady}
-								placeholder={!isReady ? "Initializing WebAssembly..." : ""}
-							/>
-						</div>
+		<div className={styles.container}>
+			<main>
+				<h1>OwO computer</h1>
+				<p>hewwo UwU</p>
+				<br />
+				<div className={styles.terminal}>
+					<div className={styles.outputContainer}>
+						{output.map((line) => (
+							<div key={line.id} className={styles.line}>
+								{line.prompt && (
+									<span className={styles.prompt}>{line.prompt} </span>
+								)}
+								<span style={{ whiteSpace: "pre-wrap" }}>{line.text}</span>
+							</div>
+						))}
+						<div ref={outputEndRef} />
 					</div>
-				</main>
-			</div>
-		</>
+
+					<div className={styles.inputContainer}>
+						<span>&gt;</span>
+						<input
+							type="text"
+							className={styles.input}
+							ref={inputRef}
+							onKeyDown={handleKeyDown}
+							disabled={!isReady}
+							placeholder={!isReady ? "Initializing WebAssembly..." : ""}
+						/>
+					</div>
+				</div>
+			</main>
+		</div>
 	);
 }

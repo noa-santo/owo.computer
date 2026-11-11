@@ -24,3 +24,8 @@
 	overflow-y: auto;
 	height: calc(100vh - 230px);
 }
+
+.line {
+	white-space: pre-wrap;
+	word-break: break-word;
+}

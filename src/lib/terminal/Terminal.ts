@@ -17,17 +17,19 @@ export class Terminal {
 	public fs: Directory;
 	public currentDir: Directory;
 	public commandRegistry: Map<string, Command>;
-	private static esbuildInitialized = false;
-	public histroy: string[];
+	private static esbuildInitPromise: Promise<void> | null = null;
 
 	public constructor() {
 		this.env = new Map<string, string[]>();
 		this.fs = new Directory();
 		this.loadDefaultFs();
-		this.currentDir = this.fs.getChildByPath("/home/owo") as Directory;
+
+		const homeDir = this.fs.getChildByPath("/home/owo");
+		this.currentDir =
+			homeDir && homeDir.type === "directory" ? homeDir : this.fs;
+
 		this.env.set("PATH", ["/bin"]);
 		this.commandRegistry = new Map<string, Command>();
-		this.histroy = [];
 	}
 
 	public async init(): Promise<void> {
@@ -35,12 +37,13 @@ export class Terminal {
 		await this.buildCommandRegistry();
 	}
 
-	private static async initEsbuild(): Promise<void> {
-		if (Terminal.esbuildInitialized) return;
-		await esbuild.initialize({
-			wasmURL: "https://unpkg.com/esbuild-wasm@0.25.0/esbuild.wasm",
-		});
-		Terminal.esbuildInitialized = true;
+	private static initEsbuild(): Promise<void> {
+		if (!Terminal.esbuildInitPromise) {
+			Terminal.esbuildInitPromise = esbuild.initialize({
+				wasmURL: "https://unpkg.com/esbuild-wasm@0.25.0/esbuild.wasm",
+			});
+		}
+		return Terminal.esbuildInitPromise;
 	}
 
 	private loadDefaultFs(): void {
@@ -148,6 +151,40 @@ export class Terminal {
 					}
 				}
 			}
+		}
+	}
+
+	public executeCommand(rawInput: string, stdin = ""): string {
+		const trimmed = rawInput.trim();
+		if (!trimmed) return "";
+
+		const parts = trimmed.split(/\s+/);
+		const cmdName = parts[0];
+		const rawArgs = parts.slice(1);
+
+		const command = this.commandRegistry.get(cmdName);
+		if (!command) {
+			return `command not found: ${cmdName}`;
+		}
+
+		const argsMap = new Map<string | number, string>();
+
+		// Populate default values defined in command metadata
+		command.metadata?.arguments?.forEach((arg) => {
+			if (arg.defaultValue !== undefined) {
+				argsMap.set(arg.flag, arg.defaultValue);
+			}
+		});
+
+		// Override with provided positional arguments
+		rawArgs.forEach((arg, index) => {
+			argsMap.set(index, arg);
+		});
+
+		try {
+			return command.method(this, argsMap, this.env, stdin);
+		} catch (err) {
+			return `Error executing command: ${err instanceof Error ? err.message : String(err)}`;
 		}
 	}
 }
