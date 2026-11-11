@@ -1,0 +1,26 @@
+.container {
+	margin: 50px;
+	font-size: 1.5em;
+}
+.inputContainer {
+	display: flex;
+	align-items: center;
+}
+
+.inputContainer span {
+	margin-right: 16px;
+}
+
+.input {
+	border: none;
+	background: none;
+	color: inherit;
+	font: inherit;
+	outline: none;
+	width: 100%;
+}
+
+.terminal {
+	overflow-y: auto;
+	height: calc(100vh - 230px);
+}
