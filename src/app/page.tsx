@@ -81,8 +81,7 @@ export default function Home() {
   return (
     <>
       {crtEffect && <CRTEffect />}
-      <div className={styles.page}>
-        <main>
+      <main className={styles.page}>
           <div
             className={styles.owo}
             onMouseOver={handleMouseOver}
@@ -92,8 +91,7 @@ export default function Home() {
           >
             {text}
           </div>
-        </main>
-      </div>
+      </main>
       <Suspense>
         <MobileControls onSwitchVariation={switchVariation} onToggleCrtEffect={toggleCrtEffect} onToggleSound={toggleSound} />
       </Suspense>
