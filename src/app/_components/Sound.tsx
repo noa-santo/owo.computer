@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
-import {useEffect, useRef, useState} from "react";
+import {useContext, useEffect, useRef, useState} from "react";
+import {StateContext} from "@/app/_components/StateContext";
 
 const Lofi = dynamic(() => import("./Lofi"), {ssr: false});
 
@@ -49,7 +50,8 @@ function createTone(ctx: AudioContext, type: OscillatorType, frequency: number, 
   return {osc, gain};
 }
 
-export default function Sound({crtEffect, text}: { crtEffect: boolean; text: string }) {
+export default function Sound({text}: {text: string }) {
+  const {crt: crtEffect} = useContext(StateContext);
   const [ctx, setCtx] = useState<AudioContext | null>(null);
   const [audioWorking, setAudioWorking] = useState(false);
   const prevText = useRef(text);
@@ -141,7 +143,7 @@ export default function Sound({crtEffect, text}: { crtEffect: boolean; text: str
     };
   }, [ctx, crtEffect]);
 
-  const [lofiOn, setLofiOn] = useState(false);
+  const {setMusic} = useContext(StateContext)
   const [lofiMounted, setLofiMounted] = useState(false);
 
   useEffect(() => {
@@ -150,11 +152,11 @@ export default function Sound({crtEffect, text}: { crtEffect: boolean; text: str
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
       setLofiMounted(true);
-      setLofiOn((on) => !on);
+      setMusic((on) => !on);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  return audioWorking && lofiMounted ? <Lofi enabled={lofiOn} /> : null;
+  return audioWorking && lofiMounted ? <Lofi /> : null;
 }

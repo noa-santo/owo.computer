@@ -1,14 +1,14 @@
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import { TiArrowShuffle, TiDeviceDesktop, TiVolumeUp } from 'react-icons/ti';
 import styles from './MobileControls.module.css';
+import {StateContext} from "@/app/_components/StateContext";
 
 type MobileControlsProps = {
   onSwitchVariation: () => void;
-  onToggleCrtEffect: () => void;
-  onToggleSound: () => void;
 }
 
-const MobileControls = ({ onSwitchVariation, onToggleCrtEffect, onToggleSound }: MobileControlsProps) => {
+const MobileControls = ({ onSwitchVariation }: MobileControlsProps) => {
+  const {toggleCrt, toggleSound} = useContext(StateContext);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     setIsMobile('ontouchstart' in document.documentElement)
@@ -19,10 +19,10 @@ const MobileControls = ({ onSwitchVariation, onToggleCrtEffect, onToggleSound }:
       <button onClick={onSwitchVariation}>
         <TiArrowShuffle />
       </button>
-      <button onClick={onToggleCrtEffect}>
+      <button onClick={toggleCrt}>
         <TiDeviceDesktop />
       </button>
-      <button onClick={onToggleSound}>
+      <button onClick={toggleSound}>
         <TiVolumeUp />
       </button>
     </div>

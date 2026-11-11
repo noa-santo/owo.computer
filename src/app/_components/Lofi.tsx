@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef } from "react";
+import {useContext, useEffect, useRef} from "react";
+import {StateContext} from "@/app/_components/StateContext";
 
 declare global {
   interface Window {
@@ -69,7 +70,8 @@ function loadYouTubeApi(): Promise<typeof YT> {
   return apiPromise;
 }
 
-export default function Lofi({ enabled }: { enabled: boolean }) {
+export default function Lofi() {
+  const {music: enabled} = useContext(StateContext)
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
   const readyRef = useRef(false);

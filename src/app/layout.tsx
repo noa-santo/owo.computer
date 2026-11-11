@@ -4,6 +4,7 @@ import "./globals.css";
 import {SpeedInsights} from "@vercel/speed-insights/next"
 import {Analytics} from "@vercel/analytics/react"
 import React from "react";
+import {StateContext, StateProvider} from "@/app/_components/StateContext";
 
 const font = Atkinson_Hyperlegible_Mono({
   variable: "--font",
@@ -25,7 +26,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${font.variable}`}>
-        {children}
+        <StateProvider>
+          {children}
+        </StateProvider>
         <SpeedInsights/>
         <Analytics/>
       </body>
