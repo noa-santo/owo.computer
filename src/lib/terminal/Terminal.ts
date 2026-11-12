@@ -1,7 +1,7 @@
 import * as esbuild from "esbuild-wasm";
 import {
 	type Argument,
-	type Command,
+	Command,
 	type Env,
 	generateShortFlags,
 	type ParsedArgs,
@@ -147,9 +147,15 @@ export class Terminal {
 
 	private static initEsbuild(): Promise<void> {
 		if (!Terminal.esbuildInitPromise) {
-			Terminal.esbuildInitPromise = esbuild.initialize({
-				wasmURL: "https://unpkg.com/esbuild-wasm@0.25.0/esbuild.wasm",
-			});
+			Terminal.esbuildInitPromise = esbuild
+				.initialize({
+					wasmURL: new URL("/esbuild.wasm", window.location.origin).href,
+				})
+				.catch((error: Error) => {
+					Terminal.esbuildInitPromise = null;
+					console.error("Failed to initialize esbuild WASM:", error);
+					throw error;
+				});
 		}
 		return Terminal.esbuildInitPromise;
 	}
@@ -188,6 +194,8 @@ export class Terminal {
 	private async parseVirtualCommand(
 		fileContent: string,
 	): Promise<Command | null> {
+		if (!fileContent.trim()) return null;
+
 		try {
 			const transformed = await esbuild.transform(fileContent, {
 				loader: "ts",
@@ -198,15 +206,33 @@ export class Terminal {
 			const exports: { default?: new () => Command } = {};
 			const module = { exports };
 
-			const runner = new Function("exports", "module", transformed.code);
-			runner(exports, module);
+			const customRequire = (moduleName: string) => {
+				if (moduleName === "Command") {
+					return { Command };
+				}
+				if (moduleName === "Filesystem") {
+					return { Directory, writeFile };
+				}
+
+				console.warn(`Module not found in virtual env: ${moduleName}`);
+				return {};
+			};
+
+			const runner = new Function(
+				"exports",
+				"module",
+				"require",
+				transformed.code,
+			);
+			runner(exports, module, customRequire);
 
 			const CmdClass = module.exports.default || exports.default;
 			if (typeof CmdClass === "function") {
 				return new CmdClass();
 			}
 			return null;
-		} catch {
+		} catch (err) {
+			console.error("Virtual command parsing failed:", err);
 			return null;
 		}
 	}
@@ -240,15 +266,17 @@ export class Terminal {
 
 				const commandName = file.name.replace(/\.tsx?$/, "");
 
-				const bundledKey = Object.keys(bundledCommands).find((key) =>
-					key.endsWith(`/${file.name}`),
-				);
+				if (file.bundled) {
+					const bundledKey = Object.keys(bundledCommands).find((key) =>
+						key.endsWith(`/${file.name}`),
+					);
 
-				if (bundledKey && bundledCommands[bundledKey]?.default) {
-					const CmdClass = bundledCommands[bundledKey].default;
-					this.commandRegistry.set(commandName, new CmdClass());
+					if (bundledKey && bundledCommands[bundledKey]?.default) {
+						const CmdClass = bundledCommands[bundledKey].default;
+						this.commandRegistry.set(commandName, new CmdClass());
+					}
 				} else {
-					const virtualCmd = await this.parseVirtualCommand(file.content);
+					const virtualCmd = await this.parseVirtualCommand(file.content || "");
 					if (virtualCmd) {
 						this.commandRegistry.set(commandName, virtualCmd);
 					}

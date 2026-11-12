@@ -32,7 +32,7 @@ export const StateProvider = ({ children }: { children: React.ReactNode }) => {
 	const [variantSet, setVariantSet] = useState<keyof typeof variants>(
 		defaultState.variantSet as keyof typeof variants,
 	);
-    const [hasHydrated, setHasHydrated] = useState<boolean>(false);
+	const [hasHydrated, setHasHydrated] = useState<boolean>(false);
 
 	useEffect(() => {
 		const storedState = localStorage.getItem("appState");
@@ -43,17 +43,17 @@ export const StateProvider = ({ children }: { children: React.ReactNode }) => {
 			setMusic(parsedState.music);
 			setVariantSet(parsedState.variantSet);
 		}
-        setHasHydrated(true);
+		setHasHydrated(true);
 	}, []);
 
 	useEffect(() => {
-        if (!hasHydrated) return;
+		if (!hasHydrated) return;
 
 		localStorage.setItem(
 			"appState",
 			JSON.stringify({ crt, sound, music, variantSet }),
 		);
-    }, [crt, sound, music, variantSet, hasHydrated]);
+	}, [crt, sound, music, variantSet, hasHydrated]);
 
 	const toggleCrt = useCallback(() => {
 		setCrt((prev) => !prev);
