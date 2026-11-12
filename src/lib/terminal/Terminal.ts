@@ -1,4 +1,4 @@
-import * as esbuild from "esbuild-wasm";
+import * as esbuild from "esbuild-wasm/esm/browser.min.js";
 import {
 	type Argument,
 	Command,
@@ -45,7 +45,7 @@ export class Terminal {
 	}
 
 	public async init(): Promise<void> {
-		await Terminal.initEsbuild();
+		Terminal.initEsbuild();
 		this.loadDefaultFs();
 
 		const savedState = localStorage.getItem("owo_terminal_state");
@@ -145,7 +145,7 @@ export class Terminal {
 		}
 	}
 
-	private static initEsbuild(): Promise<void> {
+	private static initEsbuild() {
 		if (!Terminal.esbuildInitPromise) {
 			Terminal.esbuildInitPromise = esbuild
 				.initialize({
@@ -157,7 +157,6 @@ export class Terminal {
 					throw error;
 				});
 		}
-		return Terminal.esbuildInitPromise;
 	}
 
 	private loadDefaultFs(): void {

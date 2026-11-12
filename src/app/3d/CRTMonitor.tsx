@@ -19,7 +19,7 @@ export default function CRTMonitor({
 			>
 				<div className={styles.crtScreen}>
 					<iframe src="https://owo.computer" title="OwO" />
-					<Sound crtEffect={true} text="OwO" />
+					<Sound text="OwO" />
 				</div>
 			</Html>
 		</primitive>
