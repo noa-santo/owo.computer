@@ -45,7 +45,7 @@ export class Terminal {
 	}
 
 	public async init(): Promise<void> {
-		Terminal.initEsbuild();
+		await Terminal.initEsbuild();
 		this.loadDefaultFs();
 
 		const savedState = localStorage.getItem("owo_terminal_state");
@@ -69,7 +69,7 @@ export class Terminal {
 		await this.buildCommandRegistry();
 	}
 
-	private saveState(): void {
+	saveState(): void {
 		try {
 			const fsState = this.serializeNode(this.fs);
 			if (!fsState) return;
@@ -157,6 +157,7 @@ export class Terminal {
 					throw error;
 				});
 		}
+		return Terminal.esbuildInitPromise;
 	}
 
 	private loadDefaultFs(): void {
