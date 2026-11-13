@@ -1,3 +1,4 @@
+import localFont from "next/font/local";
 import type React from "react";
 import {
 	memo,
@@ -28,8 +29,13 @@ const ICON = {
 	line: "\ue0a1",
 };
 
-const FONT =
-	'"JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Symbols Nerd Font Mono", monospace';
+const vimIcons = localFont({
+	src: "../../../fonts/vim-icons.woff2",
+	display: "block",
+	preload: false,
+});
+
+const FONT = `${vimIcons.style.fontFamily}, monospace`;
 const BG = "#1e1e1e";
 const FG = "#d4d4d4";
 const LINE_HEIGHT = 1.4;
@@ -43,8 +49,6 @@ const MODE_COLORS: Record<Mode, string> = {
 	COMMAND: "#dcdcaa",
 	SEARCH: "#dcdcaa",
 };
-
-/* ---------------- syntax highlighting (per line, per character) ---------------- */
 
 const TOKEN_RE =
 	/("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?|`(?:[^`\\]|\\.)*`?)|(\/\/.*|\/\*.*?(?:\*\/|$))|\b(const|let|var|function|import|export|default|from|if|else|return|class|interface|type|public|private|protected|readonly|switch|case|break|continue|for|while|do|try|catch|finally|throw|extends|implements|static|abstract|enum|async|await|new|this|of|in|as|typeof|instanceof|void|super)\b|\b(string|number|boolean|any|unknown|never|null|undefined|true|false)\b|\b(\d+(?:\.\d+)?)\b/g;
